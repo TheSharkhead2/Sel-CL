@@ -1,3 +1,12 @@
+from apex import amp
+from lr_scheduler import get_scheduler
+from models.preact_resnet import *
+from other_utils import *
+from MemoryMoCo import MemoryMoCo
+from kNN_test_v2 import *
+from queue_with_pro import *
+from test_eval import test_eval
+from utils_noise_v2 import *
 import torch
 import torch.nn as nn
 import torch.backends.cudnn as cudnn
@@ -17,15 +26,7 @@ import sys
 from timm.models import create_model
 
 sys.path.append('../utils')
-from utils_noise_v2 import *
-from test_eval import test_eval
-from queue_with_pro import *
-from kNN_test_v2 import *
-from MemoryMoCo import MemoryMoCo
-from other_utils import *
-from models.preact_resnet import *
-from lr_scheduler import get_scheduler
-from apex import amp
+
 
 def parse_args():
     parser = argparse.ArgumentParser(description='command for the first train')
@@ -50,7 +51,7 @@ def parse_args():
     parser.add_argument('--warmup_way', type=str, default="uns",
                         help='uns, sup')
     parser.add_argument('--warmup-epoch', type=int, default=1,
-                        help='warmup epoch')  
+                        help='warmup epoch')
     parser.add_argument('--lr', '--base-learning-rate', '--base-lr',
                         type=float, default=0.1, help='learning rate')
     parser.add_argument('--lr-scheduler', type=str, default='step',
@@ -73,7 +74,8 @@ def parse_args():
                         help='#images in each mini-batch')
     parser.add_argument('--test_batch_size', type=int, default=100,
                         help='#images in each mini-batch')
-    parser.add_argument('--cuda_dev', type=int, default=0, help='GPU to select')
+    parser.add_argument('--cuda_dev', type=int,
+                        default=0, help='GPU to select')
     parser.add_argument('--num_classes', type=int, default=10,
                         help='Number of in-distribution classes')
     parser.add_argument('--wd', type=float, default=1e-4, help='weight decay')
@@ -112,7 +114,7 @@ def parse_args():
                         help='random seed (default: 1)')
     parser.add_argument('--DA', type=str, default="complex",
                         help='Choose simple or complex data augmentation')
-    
+
     parser.add_argument('--alpha_m', type=float, default=1.0,
                         help='Beta distribution parameter for mixup')
     parser.add_argument('--alpha_moving', type=float, default=0.999,
@@ -131,8 +133,10 @@ def parse_args():
                         help='1: Use queue for sup-cl')
     parser.add_argument('--sup_queue_begin', type=int, default=3,
                         help='Epoch to begin using queue for sup-cl')
-    parser.add_argument('--queue_per_class', type=int, default=100, help='Num of samples per class to store in the queue. queue size = queue_per_class*num_classes*2')
-    parser.add_argument('--aprox', type=int, default=1, help='Approximation for numerical stability taken from supervised contrastive learning')
+    parser.add_argument('--queue_per_class', type=int, default=100,
+                        help='Num of samples per class to store in the queue. queue size = queue_per_class*num_classes*2')
+    parser.add_argument('--aprox', type=int, default=1,
+                        help='Approximation for numerical stability taken from supervised contrastive learning')
     parser.add_argument('--lambda_s', type=float, default=0.01,
                         help='weight for similarity loss')
     parser.add_argument('--lambda_c', type=float, default=1,
@@ -146,11 +150,13 @@ def parse_args():
 
 def data_config(args, transform_train, transform_test):
 
-    trainset, testset = get_dataset(args, TwoCropTransform(transform_train), transform_test)
+    trainset, testset = get_dataset(
+        args, TwoCropTransform(transform_train), transform_test)
 
-
-    train_loader = torch.utils.data.DataLoader(trainset, batch_size=args.batch_size, shuffle=True, num_workers=8, pin_memory=True)
-    test_loader = torch.utils.data.DataLoader(testset, batch_size=args.test_batch_size, shuffle=False, num_workers=8, pin_memory=True)
+    train_loader = torch.utils.data.DataLoader(
+        trainset, batch_size=args.batch_size, shuffle=True, num_workers=8, pin_memory=True)
+    test_loader = torch.utils.data.DataLoader(
+        testset, batch_size=args.test_batch_size, shuffle=False, num_workers=8, pin_memory=True)
     print('############# Data loaded #############')
 
     return train_loader, test_loader, trainset
@@ -169,6 +175,18 @@ def build_model(args, device):
         drop_block_rate=None,
         img_size=args.input_size
     )
+    model_ema = create_model(
+        args.model,
+        pretrained=False,
+        num_classes=args.nb_classes,
+        drop_rate=args.drop,
+        drop_path_rate=args.drop_path,
+        drop_block_rate=None,
+        img_size=args.input_size
+    )
+
+    model.to(device)
+    model_ema.to(device)
 
     # copy weights from `model' to `model_ema'
     moment_update(model, model_ema, 0)
@@ -176,22 +194,26 @@ def build_model(args, device):
 
 
 def main(args):
-  
-    exp_path = os.path.join(args.out, 'noise_models_' + args.network + '_{0}_SI{1}_SD{2}'.format(args.experiment_name, args.seed_initialization, args.seed_dataset), args.noise_type, str(args.noise_ratio))
-    res_path = os.path.join(args.out, 'metrics' + args.network + '_{0}_SI{1}_SD{2}'.format(args.experiment_name, args.seed_initialization, args.seed_dataset), args.noise_type, str(args.noise_ratio))
+
+    exp_path = os.path.join(args.out, 'noise_models_' + args.network + '_{0}_SI{1}_SD{2}'.format(
+        args.experiment_name, args.seed_initialization, args.seed_dataset),
+        args.noise_type, str(args.noise_ratio))
+    res_path = os.path.join(args.out, 'metrics' + args.network + '_{0}_SI{1}_SD{2}'.format(
+        args.experiment_name, args.seed_initialization, args.seed_dataset),
+        args.noise_type, str(args.noise_ratio))
 
     if not os.path.isdir(res_path):
         os.makedirs(res_path)
 
     if not os.path.isdir(exp_path):
         os.makedirs(exp_path)
-                            
-    __console__=sys.stdout
-    name= "/results"
-    log_file=open(res_path+name+".log",'a')
-    sys.stdout=log_file
+
+    __console__ = sys.stdout
+    name = "/results"
+    log_file = open(res_path+name+".log", 'a')
+    sys.stdout = log_file
     print(args)
-    
+
     args.best_acc = 0
     best_acc5 = 0
     best_acc_val = 0.0
@@ -203,7 +225,8 @@ def main(args):
     if device == "cuda":
         torch.cuda.manual_seed_all(args.seed_initialization)  # GPU seed
 
-    random.seed(args.seed_initialization)  # python seed for image transformation
+    # python seed for image transformation
+    random.seed(args.seed_initialization)
 
     if args.dataset == 'CIFAR-10':
         mean = [0.4914, 0.4822, 0.4465]
@@ -212,12 +235,12 @@ def main(args):
         mean = [0.5071, 0.4867, 0.4408]
         std = [0.2675, 0.2565, 0.2761]
 
-
     if args.DA == "complex":
         transform_train = transforms.Compose([
             transforms.RandomResizedCrop(32),
             transforms.RandomHorizontalFlip(p=0.5),
-            transforms.RandomApply([transforms.ColorJitter(0.4, 0.4, 0.4, 0.1)], p=0.8),
+            transforms.RandomApply(
+                [transforms.ColorJitter(0.4, 0.4, 0.4, 0.1)], p=0.8),
             transforms.RandomGrayscale(p=0.2),
             transforms.ToTensor(),
             transforms.Normalize(mean, std),
@@ -237,16 +260,19 @@ def main(args):
     ])
 
     # data loader
-    num_classes = args.num_classes
+    num_classes = args.nb_classes
 
-    train_loader, test_loader, trainset = data_config(args, transform_train, transform_test)
+    train_loader, test_loader, trainset = data_config(
+        args, transform_train, transform_test)
 
-    model, model_ema = build_model(args,device)
-    uns_contrast = MemoryMoCo(args.low_dim, args.uns_queue_k, args.uns_t, thresh=0).cuda()
+    model, model_ema = build_model(args, device)
+    uns_contrast = MemoryMoCo(
+        args.low_dim, args.uns_queue_k, args.uns_t, thresh=0).cuda()
 
-    
-    optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.wd)
-    model, optimizer = amp.initialize(model, optimizer, opt_level="O1",num_losses=2)
+    optimizer = optim.SGD(model.parameters(), lr=args.lr,
+                          momentum=args.momentum, weight_decay=args.wd)
+    model, optimizer = amp.initialize(
+        model, optimizer, opt_level="O1", num_losses=2)
     scheduler = get_scheduler(optimizer, len(train_loader), args)
 
     if args.sup_queue_use == 1:
@@ -254,43 +280,51 @@ def main(args):
     else:
         queue = []
 
-    np.save(res_path + '/' + str(args.noise_ratio) + '_noisy_labels.npy', np.asarray(trainset.noisy_labels))
-        
+    np.save(res_path + '/' + str(args.noise_ratio) +
+            '_noisy_labels.npy', np.asarray(trainset.noisy_labels))
+
     for epoch in range(args.initial_epoch, args.epoch + 1):
         st = time.time()
         print("=================>    ", args.experiment_name, args.noise_ratio)
-        if(epoch<=args.warmup_epoch):
-            if(args.warmup_way=='uns'):
-                train_uns(args, scheduler,model,model_ema,uns_contrast,queue,device, train_loader, optimizer, epoch)
+        if (epoch <= args.warmup_epoch):
+            if (args.warmup_way == 'uns'):
+                train_uns(args, scheduler, model, model_ema, uns_contrast,
+                          queue, device, train_loader, optimizer, epoch)
             else:
-                train_selected_loader = torch.utils.data.DataLoader(trainset, batch_size=args.batch_size, num_workers=4, pin_memory=True, sampler=torch.utils.data.WeightedRandomSampler(torch.ones(len(trainset)), len(trainset)))
-                train_sup(args, scheduler,model,model_ema,uns_contrast,queue,device, train_loader, train_selected_loader, optimizer, epoch)   
+                train_selected_loader = torch.utils.data.DataLoader(
+                    trainset, batch_size=args.batch_size, num_workers=4, pin_memory=True, sampler=torch.utils.data.WeightedRandomSampler(torch.ones(len(trainset)), len(trainset)))
+                train_sup(args, scheduler, model, model_ema, uns_contrast, queue,
+                          device, train_loader, train_selected_loader, optimizer, epoch)
         else:
-            train_selected_loader = torch.utils.data.DataLoader(trainset, batch_size=args.batch_size, num_workers=4, pin_memory=True, sampler=torch.utils.data.WeightedRandomSampler(selected_examples, len(selected_examples)))
-            train_sel(args, scheduler,model,model_ema,uns_contrast,queue,device, train_loader, train_selected_loader, optimizer, epoch,features,selected_pair_th,selected_examples)
+            train_selected_loader = torch.utils.data.DataLoader(
+                trainset, batch_size=args.batch_size, num_workers=4, pin_memory=True, sampler=torch.utils.data.WeightedRandomSampler(selected_examples, len(selected_examples)))
+            train_sel(args, scheduler, model, model_ema, uns_contrast, queue, device, train_loader,
+                      train_selected_loader, optimizer, epoch, features, selected_pair_th, selected_examples)
 
-
-        features = compute_features(args,model,train_loader,test_loader)
-        if(epoch>=args.warmup_epoch):        
+        features = compute_features(args, model, train_loader, test_loader)
+        if (epoch >= args.warmup_epoch):
             print('######## Pair-wise selection ########')
-            selected_examples,selected_pair_th = pair_selection(args, model, device, train_loader, test_loader, epoch,features)
-        
+            selected_examples, selected_pair_th = pair_selection(
+                args, model, device, train_loader, test_loader, epoch, features)
+
         print('Epoch time: {:.2f} seconds\n'.format(time.time()-st))
         log_file.flush()
         print('######## Test ########')
         test_eval(args, model, device, test_loader)
 
-        acc, acc5 = kNN(args, model, test_loader, 200,0.1,features,epoch, train_loader)
-        if acc >= args.best_acc: 
+        acc, acc5 = kNN(args, model, test_loader, 200,
+                        0.1, features, epoch, train_loader)
+        if acc >= args.best_acc:
             args.best_acc = acc
             best_acc5 = acc5
-        print('KNN top-1 precion: {:.4f} {:.4f}, best is: {:.4f} {:.4f}'.format(acc*100., \
-            acc5*100., args.best_acc*100., best_acc5*100))
+        print('KNN top-1 precion: {:.4f} {:.4f}, best is: {:.4f} {:.4f}'.format(acc*100.,
+                                                                                acc5*100., args.best_acc*100., best_acc5*100))
 
-        if (epoch %10 ==0):
-            save_model(model, optimizer, args, epoch, exp_path+"/Sel-CL_model.pth")
-            np.save(res_path + '/' + 'selected_examples_train.npy', selected_examples.data.cpu().numpy())
-
+        if (epoch % 10 == 0):
+            save_model(model, optimizer, args, epoch,
+                       exp_path+"/Sel-CL_model.pth")
+            np.save(res_path + '/' + 'selected_examples_train.npy',
+                    selected_examples.data.cpu().numpy())
 
 
 if __name__ == "__main__":

@@ -1,5 +1,7 @@
 # Copyright (c) 2015-present, Facebook, Inc.
 # All rights reserved.
+# from: https://github.com/facebookresearch/deit/blob/main/models.py
+
 import torch
 import torch.nn as nn
 from functools import partial
