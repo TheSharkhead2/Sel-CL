@@ -6,13 +6,15 @@ import numpy as np
 import argparse
 import os
 import time
-from dataset.cifar_dataset import *
+from dataset.cifar_dataset import get_dataset
 
 import torch.utils.data as data
 from torch import optim
 from torchvision import datasets, transforms, models
 import random
 import sys
+
+from timm.models import create_model
 
 sys.path.append('../utils')
 from utils_noise_v2 import *
@@ -27,58 +29,120 @@ from apex import amp
 
 def parse_args():
     parser = argparse.ArgumentParser(description='command for the first train')
-    parser.add_argument('--epoch', type=int, default=200, help='training epoches')
-    parser.add_argument('--warmup_way', type=str, default="uns", help='uns, sup')
-    parser.add_argument('--warmup-epoch', type=int, default=1, help='warmup epoch')  
-    parser.add_argument('--lr', '--base-learning-rate', '--base-lr', type=float, default=0.1, help='learning rate')
+
+    parser.add_argument(
+        '--model', default='deit_base_patch16_224', type=str, metavar='MODEL',
+        help='Name of model to train',
+        choices=[
+            "deit_tiny_patch16_224",
+            "deit_small_patch16_224",
+            "deit_base_patch16_224",
+            "deit_tiny_distilled_patch16_224",
+            "deit_small_distilled_patch16_224",
+            "deit_base_distilled_patch16_224",
+            "deit_base_patch16_384",
+            "deit_base_distilled_patch16_384"
+        ]
+    )
+
+    parser.add_argument('--epoch', type=int, default=200,
+                        help='training epoches')
+    parser.add_argument('--warmup_way', type=str, default="uns",
+                        help='uns, sup')
+    parser.add_argument('--warmup-epoch', type=int, default=1,
+                        help='warmup epoch')  
+    parser.add_argument('--lr', '--base-learning-rate', '--base-lr',
+                        type=float, default=0.1, help='learning rate')
     parser.add_argument('--lr-scheduler', type=str, default='step',
-                        choices=["step", "cosine"], help="learning rate scheduler")
-    parser.add_argument('--lr-warmup-epoch', type=int, default=1, help='warmup epoch')
-    parser.add_argument('--lr-warmup-multiplier', type=int, default=100, help='warmup multiplier')
-    parser.add_argument('--lr-decay-epochs', type=int, default=[125, 200], nargs='+',
-                        help='for step scheduler. where to decay lr, can be a list')
-    parser.add_argument('--lr-decay-rate', type=float, default=0.1,
-                        help='for step scheduler. decay rate for learning rate')
-    parser.add_argument('--initial_epoch', type=int, default=1, help="Star training at initial_epoch")
-                      
-    parser.add_argument('--batch_size', type=int, default=128, help='#images in each mini-batch')
-    parser.add_argument('--test_batch_size', type=int, default=100, help='#images in each mini-batch')
+                        choices=["step", "cosine"],
+                        help="learning rate scheduler")
+    parser.add_argument('--lr-warmup-epoch', type=int, default=1,
+                        help='warmup epoch')
+    parser.add_argument('--lr-warmup-multiplier', type=int, default=100,
+                        help='warmup multiplier')
+    parser.add_argument(
+        '--lr-decay-epochs', type=int, default=[125, 200], nargs='+',
+        help='for step scheduler. where to decay lr, can be a list')
+    parser.add_argument(
+        '--lr-decay-rate', type=float, default=0.1,
+        help='for step scheduler. decay rate for learning rate')
+    parser.add_argument('--initial_epoch', type=int, default=1,
+                        help="Star training at initial_epoch")
+
+    parser.add_argument('--batch_size', type=int, default=128,
+                        help='#images in each mini-batch')
+    parser.add_argument('--test_batch_size', type=int, default=100,
+                        help='#images in each mini-batch')
     parser.add_argument('--cuda_dev', type=int, default=0, help='GPU to select')
-    parser.add_argument('--num_classes', type=int, default=10, help='Number of in-distribution classes')
+    parser.add_argument('--num_classes', type=int, default=10,
+                        help='Number of in-distribution classes')
     parser.add_argument('--wd', type=float, default=1e-4, help='weight decay')
     parser.add_argument('--momentum', default=0.9, type=float, help='momentum')
-    parser.add_argument('--noise_type', default='asymmetric', help='symmetric or asymmetric')
-    parser.add_argument('--noise_ratio', type=float, default=0.4, help='percent of noise')
-    parser.add_argument('--train_root', default='./dataset', help='root for train data')
-    parser.add_argument('--out', type=str, default='./out', help='Directory of the output')
-    parser.add_argument('--experiment_name', type=str, default = 'Proof',help='name of the experiment (for the output files)')
-    parser.add_argument('--dataset', type=str, default='CIFAR-10', help='CIFAR-10, CIFAR-100')
-    parser.add_argument('--download', type=bool, default=False, help='download dataset')
+    parser.add_argument('--noise_type', default='asymmetric',
+                        help='symmetric or asymmetric')
+    parser.add_argument('--noise_ratio', type=float, default=0.4,
+                        help='percent of noise')
+    parser.add_argument('--train_root', default='./dataset',
+                        help='root for train data')
+    parser.add_argument('--out', type=str, default='./out',
+                        help='Directory of the output')
+    parser.add_argument('--experiment_name', type=str, default='Proof',
+                        help='name of the experiment (for the output files)')
 
-    parser.add_argument('--network', type=str, default='PR18', help='Network architecture')
-    parser.add_argument('--low_dim', type=int, default=128, help='Size of contrastive learning embedding')
-    parser.add_argument('--headType', type=str, default="Linear", help='Linear, NonLinear')
-    parser.add_argument('--seed_initialization', type=int, default=1, help='random seed (default: 1)')
-    parser.add_argument('--seed_dataset', type=int, default=42, help='random seed (default: 1)')
-    parser.add_argument('--DA', type=str, default="complex", help='Choose simple or complex data augmentation')
+    parser.add_argument(
+        '--dataset', type=str, default='CIFAR-10', help='CIFAR-10, CIFAR-100',
+        choices=[
+            'CIFAR-10',
+            'CIFAR-100',
+            'inat'
+        ]
+    )
+    parser.add_argument('--download', type=bool, default=False,
+                        help='download dataset')
+
+    parser.add_argument('--network', type=str, default='PR18',
+                        help='Network architecture')
+    parser.add_argument('--low_dim', type=int, default=128,
+                        help='Size of contrastive learning embedding')
+    parser.add_argument('--headType', type=str, default="Linear",
+                        help='Linear, NonLinear')
+    parser.add_argument('--seed_initialization', type=int, default=1,
+                        help='random seed (default: 1)')
+    parser.add_argument('--seed_dataset', type=int, default=42,
+                        help='random seed (default: 1)')
+    parser.add_argument('--DA', type=str, default="complex",
+                        help='Choose simple or complex data augmentation')
     
-    parser.add_argument('--alpha_m', type=float, default=1.0, help='Beta distribution parameter for mixup')
-    parser.add_argument('--alpha_moving', type=float, default=0.999, help='exponential moving average weight')
-    parser.add_argument('--alpha', type=float, default=0.5, help='example selection th')
-    parser.add_argument('--beta', type=float, default=0.5, help='pair selection th')
-    parser.add_argument('--uns_queue_k', type=int, default=10000, help='uns-cl num negative sampler')
-    parser.add_argument('--uns_t', type=float, default=0.1, help='uns-cl temperature')
-    parser.add_argument('--sup_t', default=0.1, type=float, help='sup-cl temperature')
-    parser.add_argument('--sup_queue_use', type=int, default=1, help='1: Use queue for sup-cl')
-    parser.add_argument('--sup_queue_begin', type=int, default=3, help='Epoch to begin using queue for sup-cl')
+    parser.add_argument('--alpha_m', type=float, default=1.0,
+                        help='Beta distribution parameter for mixup')
+    parser.add_argument('--alpha_moving', type=float, default=0.999,
+                        help='exponential moving average weight')
+    parser.add_argument('--alpha', type=float, default=0.5,
+                        help='example selection th')
+    parser.add_argument('--beta', type=float, default=0.5,
+                        help='pair selection th')
+    parser.add_argument('--uns_queue_k', type=int, default=10000,
+                        help='uns-cl num negative sampler')
+    parser.add_argument('--uns_t', type=float, default=0.1,
+                        help='uns-cl temperature')
+    parser.add_argument('--sup_t', default=0.1, type=float,
+                        help='sup-cl temperature')
+    parser.add_argument('--sup_queue_use', type=int, default=1,
+                        help='1: Use queue for sup-cl')
+    parser.add_argument('--sup_queue_begin', type=int, default=3,
+                        help='Epoch to begin using queue for sup-cl')
     parser.add_argument('--queue_per_class', type=int, default=100, help='Num of samples per class to store in the queue. queue size = queue_per_class*num_classes*2')
     parser.add_argument('--aprox', type=int, default=1, help='Approximation for numerical stability taken from supervised contrastive learning')
-    parser.add_argument('--lambda_s', type=float, default=0.01, help='weight for similarity loss')
-    parser.add_argument('--lambda_c', type=float, default=1, help='weight for classification loss')
-    parser.add_argument('--k_val', type=int, default=250, help='k for k-nn correction')
-    
+    parser.add_argument('--lambda_s', type=float, default=0.01,
+                        help='weight for similarity loss')
+    parser.add_argument('--lambda_c', type=float, default=1,
+                        help='weight for classification loss')
+    parser.add_argument('--k_val', type=int, default=250,
+                        help='k for k-nn correction')
+
     args = parser.parse_args()
     return args
+
 
 def data_config(args, transform_train, transform_test):
 
@@ -91,13 +155,25 @@ def data_config(args, transform_train, transform_test):
 
     return train_loader, test_loader, trainset
 
-def build_model(args,device):
-    model = PreActResNet18(num_classes=args.num_classes, low_dim=args.low_dim, head=args.headType).to(device)
-    model_ema = PreActResNet18(num_classes=args.num_classes, low_dim=args.low_dim, head=args.headType).to(device)
-    
+
+def build_model(args, device):
+    # model = PreActResNet18(num_classes=args.num_classes, low_dim=args.low_dim, head=args.headType).to(device)
+    # model_ema = PreActResNet18(num_classes=args.num_classes, low_dim=args.low_dim, head=args.headType).to(device)
+
+    model = create_model(
+        args.model,
+        pretrained=False,
+        num_classes=args.nb_classes,
+        drop_rate=args.drop,
+        drop_path_rate=args.drop_path,
+        drop_block_rate=None,
+        img_size=args.input_size
+    )
+
     # copy weights from `model' to `model_ema'
     moment_update(model, model_ema, 0)
     return model, model_ema
+
 
 def main(args):
   
