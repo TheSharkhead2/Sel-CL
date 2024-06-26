@@ -372,11 +372,11 @@ def main(args):
     uns_contrast = MemoryMoCo(
         args.low_dim, args.uns_queue_k, args.uns_t, thresh=0).cuda()
 
-    # optimizer = optim.SGD(model.parameters(), lr=args.lr,
-    #                       momentum=args.momentum, weight_decay=args.wd)
-    # model, optimizer = amp.initialize(
-    #     model, optimizer, opt_level="O1", num_losses=2)
-    optimizer = create_optimizer(args, model)
+    optimizer = optim.SGD(model.parameters(), lr=args.lr,
+                          momentum=args.momentum, weight_decay=args.wd)
+    model, optimizer = amp.initialize(
+        model, optimizer, opt_level="O1", num_losses=2)
+    # optimizer = create_optimizer(args, model)
     scheduler = get_scheduler(optimizer, len(train_loader), args)
     # loss_scaler = NativeScaler()
 
