@@ -1,6 +1,9 @@
+import sys
+sys.path.append('../utils')
+
 from apex import amp
 from lr_scheduler import get_scheduler
-from models.preact_resnet import *
+from models.models import *
 from other_utils import *
 from MemoryMoCo import MemoryMoCo
 from kNN_test_v2 import *
@@ -16,16 +19,17 @@ import argparse
 import os
 import time
 from dataset.cifar_dataset import get_dataset
-
 import torch.utils.data as data
 from torch import optim
 from torchvision import datasets, transforms, models
 import random
-import sys
+from timm.optim import create_optimizer
+# from timm.models import create_model
 
-from timm.models import create_model
 
-sys.path.append('../utils')
+
+
+# from timm.utils import NativeScaler  # , get_state_dict, ModelEma
 
 
 def parse_args():
@@ -45,10 +49,16 @@ def parse_args():
             "deit_base_distilled_patch16_384"
         ]
     )
+    parser.add_argument('--drop', type=float, default=0.0, metavar='PCT',
+                        help='Dropout rate (default: 0.)')
+    parser.add_argument('--drop-path', type=float, default=0.1, metavar='PCT',
+                        help='Drop path rate (default: 0.1)')
+    parser.add_argument('--input-size', default=224,
+                        type=int, help='images input size')
 
     parser.add_argument('--epoch', type=int, default=200,
                         help='training epoches')
-    parser.add_argument('--warmup_way', type=str, default="uns",
+    parser.add_argument('--warmup-way', type=str, default="uns",
                         help='uns, sup')
     parser.add_argument('--warmup-epoch', type=int, default=1,
                         help='warmup epoch')
@@ -67,28 +77,28 @@ def parse_args():
     parser.add_argument(
         '--lr-decay-rate', type=float, default=0.1,
         help='for step scheduler. decay rate for learning rate')
-    parser.add_argument('--initial_epoch', type=int, default=1,
+    parser.add_argument('--initial-epoch', type=int, default=1,
                         help="Star training at initial_epoch")
 
-    parser.add_argument('--batch_size', type=int, default=128,
+    parser.add_argument('--batch-size', type=int, default=128,
                         help='#images in each mini-batch')
-    parser.add_argument('--test_batch_size', type=int, default=100,
+    parser.add_argument('--test-batch-size', type=int, default=100,
                         help='#images in each mini-batch')
-    parser.add_argument('--cuda_dev', type=int,
+    parser.add_argument('--cuda-dev', type=int,
                         default=0, help='GPU to select')
-    parser.add_argument('--num_classes', type=int, default=10,
+    parser.add_argument('--num-classes', type=int, default=10,
                         help='Number of in-distribution classes')
     parser.add_argument('--wd', type=float, default=1e-4, help='weight decay')
     parser.add_argument('--momentum', default=0.9, type=float, help='momentum')
-    parser.add_argument('--noise_type', default='asymmetric',
+    parser.add_argument('--noise-type', default='asymmetric',
                         help='symmetric or asymmetric')
-    parser.add_argument('--noise_ratio', type=float, default=0.4,
+    parser.add_argument('--noise-ratio', type=float, default=0.4,
                         help='percent of noise')
-    parser.add_argument('--train_root', default='./dataset',
+    parser.add_argument('--train-root', default='./dataset',
                         help='root for train data')
     parser.add_argument('--out', type=str, default='./out',
                         help='Directory of the output')
-    parser.add_argument('--experiment_name', type=str, default='Proof',
+    parser.add_argument('--experiment-name', type=str, default='Proof',
                         help='name of the experiment (for the output files)')
 
     parser.add_argument(
@@ -96,7 +106,7 @@ def parse_args():
         choices=[
             'CIFAR-10',
             'CIFAR-100',
-            'inat'
+            'inat100k'
         ]
     )
     parser.add_argument('--download', type=bool, default=False,
@@ -104,48 +114,85 @@ def parse_args():
 
     parser.add_argument('--network', type=str, default='PR18',
                         help='Network architecture')
-    parser.add_argument('--low_dim', type=int, default=128,
+    parser.add_argument('--low-dim', type=int, default=128,
                         help='Size of contrastive learning embedding')
     parser.add_argument('--headType', type=str, default="Linear",
                         help='Linear, NonLinear')
-    parser.add_argument('--seed_initialization', type=int, default=1,
+    parser.add_argument('--seed-initialization', type=int, default=1,
                         help='random seed (default: 1)')
-    parser.add_argument('--seed_dataset', type=int, default=42,
+    parser.add_argument('--seed-dataset', type=int, default=42,
                         help='random seed (default: 1)')
     parser.add_argument('--DA', type=str, default="complex",
                         help='Choose simple or complex data augmentation')
 
-    parser.add_argument('--alpha_m', type=float, default=1.0,
+    parser.add_argument('--alpha-m', type=float, default=1.0,
                         help='Beta distribution parameter for mixup')
-    parser.add_argument('--alpha_moving', type=float, default=0.999,
+    parser.add_argument('--alpha-moving', type=float, default=0.999,
                         help='exponential moving average weight')
     parser.add_argument('--alpha', type=float, default=0.5,
                         help='example selection th')
     parser.add_argument('--beta', type=float, default=0.5,
                         help='pair selection th')
-    parser.add_argument('--uns_queue_k', type=int, default=10000,
+    parser.add_argument('--uns-queue-k', type=int, default=10000,
                         help='uns-cl num negative sampler')
-    parser.add_argument('--uns_t', type=float, default=0.1,
+    parser.add_argument('--uns-t', type=float, default=0.1,
                         help='uns-cl temperature')
-    parser.add_argument('--sup_t', default=0.1, type=float,
+    parser.add_argument('--sup-t', default=0.1, type=float,
                         help='sup-cl temperature')
-    parser.add_argument('--sup_queue_use', type=int, default=1,
+    parser.add_argument('--sup-queue-use', type=int, default=1,
                         help='1: Use queue for sup-cl')
-    parser.add_argument('--sup_queue_begin', type=int, default=3,
+    parser.add_argument('--sup-queue-begin', type=int, default=3,
                         help='Epoch to begin using queue for sup-cl')
-    parser.add_argument('--queue_per_class', type=int, default=100,
+    parser.add_argument('--queue-per-class', type=int, default=100,
                         help='Num of samples per class to store in the queue. queue size = queue_per_class*num_classes*2')
     parser.add_argument('--aprox', type=int, default=1,
                         help='Approximation for numerical stability taken from supervised contrastive learning')
-    parser.add_argument('--lambda_s', type=float, default=0.01,
+    parser.add_argument('--lambda-s', type=float, default=0.01,
                         help='weight for similarity loss')
-    parser.add_argument('--lambda_c', type=float, default=1,
+    parser.add_argument('--lambda-c', type=float, default=1,
                         help='weight for classification loss')
-    parser.add_argument('--k_val', type=int, default=250,
+    parser.add_argument('--k-val', type=int, default=250,
                         help='k for k-nn correction')
 
     args = parser.parse_args()
     return args
+
+# class NativeScaler:
+#     # originally from: https://github.com/huggingface/pytorch-image-models/blob/d4ef0b4d589c9b0cb1d6240ff373c5508dbb8023/timm/utils/cuda.py#L46
+
+
+#     state_dict_key = "amp_scaler"
+
+#     def __init__(self):
+#         self._scaler = torch.cuda.amp.GradScaler()
+
+#     def __call__(
+#             self,
+#             loss,
+#             optimizer,
+#             clip_grad=None,
+#             clip_mode='norm',
+#             parameters=None,
+#             create_graph=False,
+#             need_update=True,
+#             retain_graph=False,
+#     ):
+#         self._scaler.scale(loss).backward(
+#             create_graph=create_graph, retain_graph=retain_graph)
+#         if need_update:
+#             if clip_grad is not None:
+#                 assert parameters is not None
+#                 # unscale the gradients of optimizer's assigned params in-place
+#                 self._scaler.unscale_(optimizer)
+#                 dispatch_clip_grad(parameters, clip_grad, mode=clip_mode)
+#             self._scaler.step(optimizer)
+#             self._scaler.update()
+
+#     def state_dict(self):
+#         return self._scaler.state_dict()
+
+#     def load_state_dict(self, state_dict):
+#         self._scaler.load_state_dict(state_dict)
 
 
 def data_config(args, transform_train, transform_test):
@@ -162,28 +209,79 @@ def data_config(args, transform_train, transform_test):
     return train_loader, test_loader, trainset
 
 
+def create_model(args):
+    if args.model == "deit_tiny_patch16_224":
+        return deit_tiny_patch16_224(
+            num_classes=args.num_classes,
+            drop_rate=args.drop,
+            drop_path_rate=args.drop_path,
+            # drop_block_rate=None,
+            img_size=args.input_size,
+        )
+    elif args.model == "deit_small_patch16_224":
+        return deit_small_patch16_224(
+            num_classes=args.num_classes,
+            drop_rate=args.drop,
+            drop_path_rate=args.drop_path,
+            # drop_block_rate=None,
+            img_size=args.input_size,
+        )
+    elif args.model == "deit_base_patch16_224":
+        return deit_base_patch16_224(
+            num_classes=args.num_classes,
+            drop_rate=args.drop,
+            drop_path_rate=args.drop_path,
+            # drop_block_rate=None,
+            img_size=args.input_size,
+        )
+    elif args.model == "deit_base_patch16_384":
+        return deit_base_distilled_patch16_384(
+            num_classes=args.num_classes,
+            drop_rate=args.drop,
+            drop_path_rate=args.drop_path,
+            # drop_block_rate=None,
+            img_size=args.input_size,
+        )
+    elif args.model == "deit_tiny_distilled_patch16_224":
+        return deit_tiny_distilled_patch16_224(
+            num_classes=args.num_classes,
+            drop_rate=args.drop,
+            drop_path_rate=args.drop_path,
+            # drop_block_rate=None,
+            img_size=args.input_size,
+        )
+    elif args.model == "deit_small_distilled_patch16_224":
+        return deit_small_distilled_patch16_224(
+            num_classes=args.num_classes,
+            drop_rate=args.drop,
+            drop_path_rate=args.drop_path,
+            # drop_block_rate=None,
+            img_size=args.input_size,
+        )
+    elif args.model == "deit_base_distilled_patch16_224":
+        return deit_base_distilled_patch16_224(
+            num_classes=args.num_classes,
+            drop_rate=args.drop,
+            drop_path_rate=args.drop_path,
+            # drop_block_rate=None,
+            img_size=args.input_size,
+        )
+    elif args.model == "deit_base_distilled_patch16_384":
+        return deit_base_distilled_distilled_patch16_384(
+            num_classes=args.num_classes,
+            drop_rate=args.drop,
+            drop_path_rate=args.drop_path,
+            # drop_block_rate=None,
+            img_size=args.input_size,
+        )
+
+
 def build_model(args, device):
     # model = PreActResNet18(num_classes=args.num_classes, low_dim=args.low_dim, head=args.headType).to(device)
     # model_ema = PreActResNet18(num_classes=args.num_classes, low_dim=args.low_dim, head=args.headType).to(device)
 
-    model = create_model(
-        args.model,
-        pretrained=False,
-        num_classes=args.nb_classes,
-        drop_rate=args.drop,
-        drop_path_rate=args.drop_path,
-        drop_block_rate=None,
-        img_size=args.input_size
-    )
-    model_ema = create_model(
-        args.model,
-        pretrained=False,
-        num_classes=args.nb_classes,
-        drop_rate=args.drop,
-        drop_path_rate=args.drop_path,
-        drop_block_rate=None,
-        img_size=args.input_size
-    )
+    model = create_model(args)
+    model_ema = create_model(args)
 
     model.to(device)
     model_ema.to(device)
@@ -234,6 +332,11 @@ def main(args):
     elif args.dataset == 'CIFAR-100':
         mean = [0.5071, 0.4867, 0.4408]
         std = [0.2675, 0.2565, 0.2761]
+    elif args.dataset == "inat100k":
+        # 123.3945866481466, 126.3885961963497, 107.48126061777886
+        mean = [0.4839, 0.4956, 0.4215]
+        # 55.34541875861789, 54.35099612029171, 62.73211140831446
+        std = [0.2170, 0.2131, 0.2460]
 
     if args.DA == "complex":
         transform_train = transforms.Compose([
@@ -260,7 +363,7 @@ def main(args):
     ])
 
     # data loader
-    num_classes = args.nb_classes
+    num_classes = args.num_classes
 
     train_loader, test_loader, trainset = data_config(
         args, transform_train, transform_test)
@@ -269,11 +372,13 @@ def main(args):
     uns_contrast = MemoryMoCo(
         args.low_dim, args.uns_queue_k, args.uns_t, thresh=0).cuda()
 
-    optimizer = optim.SGD(model.parameters(), lr=args.lr,
-                          momentum=args.momentum, weight_decay=args.wd)
-    model, optimizer = amp.initialize(
-        model, optimizer, opt_level="O1", num_losses=2)
+    # optimizer = optim.SGD(model.parameters(), lr=args.lr,
+    #                       momentum=args.momentum, weight_decay=args.wd)
+    # model, optimizer = amp.initialize(
+    #     model, optimizer, opt_level="O1", num_losses=2)
+    optimizer = create_optimizer(args, model)
     scheduler = get_scheduler(optimizer, len(train_loader), args)
+    # loss_scaler = NativeScaler()
 
     if args.sup_queue_use == 1:
         queue = queue_with_pro(args, device)

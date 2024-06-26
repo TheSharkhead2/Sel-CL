@@ -26,8 +26,8 @@ def get_all_classes(*dirs):
 def get_dataset(args, transform_train, transform_test):
     # prepare datasets
 
-    traindir = os.path.join(args.data_path, 'train')
-    valdir = os.path.join(args.data_path, 'val')
+    traindir = os.path.join(args.train_root, 'train')
+    valdir = os.path.join(args.train_root, 'val')
 
     all_classes = get_all_classes(traindir, valdir)
 
@@ -44,7 +44,7 @@ def get_dataset(args, transform_train, transform_test):
         train = Cifar100Train(
             args, train=True, transform=transform_train,
             target_transform=transform_test, download=args.download)
-    elif args.dataset == 'inat':
+    elif args.dataset == 'inat100k':
         train = iNatDataset(
             args,
             train=True,
@@ -89,7 +89,7 @@ def get_dataset(args, transform_train, transform_test):
             root=args.train_root, train=False, download=args.download,
             transform=transform_test
         )
-    elif args.dataset == "inat":
+    elif args.dataset == "inat100k":
         testset = iNatDataset(
             args,
             train=False,
@@ -187,7 +187,7 @@ class iNatDataset(ImageFolder):
                 self.targets[idxes[i]] = label_sym
             self.soft_labels[idxes[i]][self.targets[idxes[i]]] = 1
 
-        self.targets = np.asarray(self.targets, dtype=np.long)
+        self.targets = np.asarray(self.targets, dtype=np.longdouble)
         self.noisy_labels = np.copy(self.targets)
         self.noisy_indexes = noisy_indexes
         self.clean_labels = clean_labels
@@ -251,9 +251,9 @@ class iNatDataset(ImageFolder):
             else:
                 self.noisy_indexes.append(idxes[i])
 
-        self.targets = np.asarray(self.targets, dtype=np.long)
-        self.clean_indexes = np.asarray(self.clean_indexes, dtype=np.long)
-        self.noisy_indexes = np.asarray(self.noisy_indexes, dtype=np.long)
+        self.targets = np.asarray(self.targets, dtype=np.longdouble)
+        self.clean_indexes = np.asarray(self.clean_indexes, dtype=np.longdouble)
+        self.noisy_indexes = np.asarray(self.noisy_indexes, dtype=np.longdouble)
         self.noisy_labels = self.targets
         self.clean_labels = clean_labels
         print('clean_num', sum(self.noisy_labels == self.clean_labels))
@@ -333,7 +333,7 @@ class Cifar10Train(tv.datasets.CIFAR10):
                 self.targets[idxes[i]] = label_sym
             self.soft_labels[idxes[i]][self.targets[idxes[i]]] = 1
 
-        self.targets = np.asarray(self.targets, dtype=np.long)
+        self.targets = np.asarray(self.targets, dtype=np.longdouble)
         self.noisy_labels = np.copy(self.targets)
         self.noisy_indexes = noisy_indexes
         self.clean_labels = clean_labels
@@ -397,9 +397,9 @@ class Cifar10Train(tv.datasets.CIFAR10):
             else:
                 self.noisy_indexes.append(idxes[i])
 
-        self.targets = np.asarray(self.targets, dtype=np.long)
-        self.clean_indexes = np.asarray(self.clean_indexes, dtype=np.long)
-        self.noisy_indexes = np.asarray(self.noisy_indexes, dtype=np.long)
+        self.targets = np.asarray(self.targets, dtype=np.longdouble)
+        self.clean_indexes = np.asarray(self.clean_indexes, dtype=np.longdouble)
+        self.noisy_indexes = np.asarray(self.noisy_indexes, dtype=np.longdouble)
         self.noisy_labels = self.targets
         self.clean_labels = clean_labels
         print('clean_num',sum(self.noisy_labels==self.clean_labels))
@@ -442,7 +442,7 @@ class Cifar10Train(tv.datasets.CIFAR10):
                 self.targets[idxes[i]] = label_sym
             self.soft_labels[idxes[i]][self.targets[idxes[i]]] = 1
 
-        self.targets = np.asarray(self.targets, dtype=np.long)
+        self.targets = np.asarray(self.targets, dtype=np.longdouble)
         self.noisy_labels = np.copy(self.targets)
         self.noisy_indexes = noisy_indexes
         self.clean_labels = clean_labels
@@ -506,9 +506,9 @@ class Cifar10Train(tv.datasets.CIFAR10):
             else:
                 self.noisy_indexes.append(idxes[i])
 
-        self.targets = np.asarray(self.targets, dtype=np.long)
-        self.clean_indexes = np.asarray(self.clean_indexes, dtype=np.long)
-        self.noisy_indexes = np.asarray(self.noisy_indexes, dtype=np.long)
+        self.targets = np.asarray(self.targets, dtype=np.longdouble)
+        self.clean_indexes = np.asarray(self.clean_indexes, dtype=np.longdouble)
+        self.noisy_indexes = np.asarray(self.noisy_indexes, dtype=np.longdouble)
         self.noisy_labels = self.targets
         self.clean_labels = clean_labels
         print('clean_num',sum(self.noisy_labels==self.clean_labels))
@@ -589,7 +589,7 @@ class Cifar100Train(tv.datasets.CIFAR100):
                 self.targets[idxes[i]] = label_sym
             self.soft_labels[idxes[i]][self.targets[idxes[i]]] = 1
 
-        self.targets = np.asarray(self.targets, dtype=np.long)
+        self.targets = np.asarray(self.targets, dtype=np.longdouble)
         self.noisy_labels = np.copy(self.targets)
         self.noisy_indexes = noisy_indexes
         self.clean_labels = clean_labels
@@ -648,9 +648,9 @@ class Cifar100Train(tv.datasets.CIFAR100):
             else:
                 self.noisy_indexes.append(idxes[t])
 
-        self.targets = np.asarray(self.targets, dtype=np.long)
-        self.clean_indexes = np.asarray(self.clean_indexes, dtype=np.long)
-        self.noisy_indexes = np.asarray(self.noisy_indexes, dtype=np.long)
+        self.targets = np.asarray(self.targets, dtype=np.longdouble)
+        self.clean_indexes = np.asarray(self.clean_indexes, dtype=np.longdouble)
+        self.noisy_indexes = np.asarray(self.noisy_indexes, dtype=np.longdouble)
         self.noisy_labels = self.targets
         self.clean_labels = clean_labels
         print('clean_num',sum(self.noisy_labels==self.clean_labels))

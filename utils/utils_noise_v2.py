@@ -163,10 +163,12 @@ def train_sel(args, scheduler, model, model_ema, contrast, queue, device, train_
         if (args.lambda_s > 0):
             with amp.scale_loss(args.lambda_s*loss_simi, optimizer, loss_id=1) as scaled_loss:
                 scaled_loss.backward(retain_graph=True)
+            # loss_scaler(loss, optimizer, parameters=model.parameters(), retain_graph=True)
             nn.utils.clip_grad_norm_(amp.master_params(
                 optimizer), max_norm=0.25, norm_type=2)
         with amp.scale_loss(loss, optimizer, loss_id=0) as scaled_loss:
             scaled_loss.backward()
+        # loss_scaler(loss, optimizer, parameters=model.parameters(), retain_graph=True)
         optimizer.step()
         scheduler.step()
 
@@ -197,7 +199,8 @@ def train_uns(
     device,
     train_loader,
     optimizer,
-    epoch
+    epoch,
+    # loss_scaler
 ):
     train_loss_1 = AverageMeter()
 
@@ -244,6 +247,7 @@ def train_uns(
 
         with amp.scale_loss(uns_loss, optimizer, loss_id=0) as scaled_loss:
             scaled_loss.backward()
+        # loss_scaler(uns_loss, optimizer, parameters=model.parameters())
         optimizer.step()
         scheduler.step()
 
@@ -272,7 +276,8 @@ def train_sup(
     train_loader,
     train_selected_loader,
     optimizer,
-    epoch
+    epoch,
+    # loss_scaler
 ):
     train_loss_1 = AverageMeter()
     train_loss_3 = AverageMeter()
@@ -395,6 +400,8 @@ def train_sup(
 
         with amp.scale_loss(loss, optimizer, loss_id=0) as scaled_loss:
             scaled_loss.backward()
+        # loss_scaler(loss, optimizer, parameters=model.parameters())
+
         optimizer.step()
         scheduler.step()
 
