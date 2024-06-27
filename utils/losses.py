@@ -4,54 +4,117 @@ import torch.nn.functional as F
 import numpy as np
 
 
-
-def Supervised_ContrastiveLearning_loss(args, pairwise_comp, maskSup, mask2Sup, maskUnsup, mask2Unsup, logits_mask, lam1, lam2, bsz, epoch, device,batch_idx):
+def Supervised_ContrastiveLearning_loss(
+    args,
+    pairwise_comp,
+    maskSup,
+    mask2Sup,
+    maskUnsup,
+    mask2Unsup,
+    logits_mask,
+    lam1,
+    lam2,
+    bsz,
+    epoch,
+    device,
+    batch_idx
+):
 
     logits = torch.div(pairwise_comp, args.sup_t)
+
+    # these are MASSIVE (4000+) if I don't do this
+    logits = torch.clamp(logits, max=args.max_logits)
 
     exp_logits = torch.exp(logits) * logits_mask  # remove diagonal
 
     if args.aprox == 1:
-        log_prob = logits - torch.log(exp_logits.sum(1, keepdim=True))  ## Approximation for numerical stability taken from supervised contrastive learning
+        # Approximation for numerical stability taken from supervised
+        # contrastive learning
+        log_prob = logits - torch.log(exp_logits.sum(1, keepdim=True))
     else:
-        log_prob = torch.log(torch.exp(logits) + 1e-7) - torch.log(exp_logits.sum(1, keepdim=True) + 1e-7)
+        log_prob = (
+            torch.log(torch.exp(logits) + 1e-7) -
+            torch.log(exp_logits.sum(1, keepdim=True) + 1e-7)
+        )
 
     exp_logits2 = torch.exp(logits) * logits_mask  # remove diagonal
 
     if args.aprox == 1:
-        log_prob2 = logits - torch.log(exp_logits2.sum(1, keepdim=True))  ## Approximation for numerical stability taken from supervised contrastive learning
+        # Approximation for numerical stability taken from supervised
+        # contrastive learning
+        log_prob2 = logits - torch.log(exp_logits2.sum(1, keepdim=True))
     else:
-        log_prob2 = torch.log(torch.exp(logits) + 1e-7) - torch.log(exp_logits2.sum(1, keepdim=True) + 1e-7)
+        log_prob2 = (
+            torch.log(torch.exp(logits) + 1e-7) -
+            torch.log(exp_logits2.sum(1, keepdim=True) + 1e-7)
+        )
 
-    # compute mean of log-likelihood over positive (weight individual loss terms with mixing coefficients)
-    mean_log_prob_pos_sup = (maskSup * log_prob).sum(1) / (maskSup.sum(1) + maskUnsup.sum(1))
-    mean_log_prob_pos_unsup = (maskUnsup * log_prob).sum(1) / (maskSup.sum(1) + maskUnsup.sum(1))
-    ## Second mixup term log-probs
-    mean_log_prob_pos2_sup = (mask2Sup * log_prob2).sum(1) / (mask2Sup.sum(1) + mask2Unsup.sum(1))
-    mean_log_prob_pos2_unsup = (mask2Unsup * log_prob2).sum(1) / (mask2Sup.sum(1) + mask2Unsup.sum(1))
+    # compute mean of log-likelihood over positive
+    # (weight individual loss terms with mixing coefficients)
+    mean_log_prob_pos_sup = (
+        (maskSup * log_prob).sum(1) / (maskSup.sum(1) + maskUnsup.sum(1))
+    )
+    mean_log_prob_pos_unsup = (
+        (maskUnsup * log_prob).sum(1) / (maskSup.sum(1) + maskUnsup.sum(1))
+    )
 
-    ## Weight first and second mixup term (both data views) with the corresponding mixing weight
+    # Second mixup term log-probs
+    mean_log_prob_pos2_sup = (
+        (mask2Sup * log_prob2).sum(1) / (mask2Sup.sum(1) + mask2Unsup.sum(1))
+    )
+    mean_log_prob_pos2_unsup = (
+        (mask2Unsup * log_prob2).sum(1) / (mask2Sup.sum(1) + mask2Unsup.sum(1))
+    )
 
-    ##First mixup term. First mini-batch part. Unsupervised + supervised loss separated
-    loss1a = -lam1 * mean_log_prob_pos_unsup[:int(len(mean_log_prob_pos_unsup) / 2)] - lam1 * mean_log_prob_pos_sup[:int(len(mean_log_prob_pos_sup) / 2)]
-    ##First mixup term. Second mini-batch part. Unsupervised + supervised loss separated
-    loss1b = -lam2 * mean_log_prob_pos_unsup[int(len(mean_log_prob_pos_unsup) / 2):] - lam2 * mean_log_prob_pos_sup[int(len(mean_log_prob_pos_sup) / 2):]
-    ## All losses for first mixup term
+    # Weight first and second mixup term (both data views)
+    # with the corresponding mixing weight
+
+    # First mixup term. First mini-batch part.
+    # Unsupervised + supervised loss separated
+    loss1a = (
+        -lam1 *
+        mean_log_prob_pos_unsup[:int(len(mean_log_prob_pos_unsup) / 2)] -
+        lam1 * mean_log_prob_pos_sup[:int(len(mean_log_prob_pos_sup) / 2)]
+    )
+
+    # First mixup term. Second mini-batch part.
+    # Unsupervised + supervised loss separated
+    loss1b = (
+        -lam2 *
+        mean_log_prob_pos_unsup[int(len(mean_log_prob_pos_unsup) / 2):] -
+        lam2 * mean_log_prob_pos_sup[int(len(mean_log_prob_pos_sup) / 2):]
+    )
+
+    # All losses for first mixup term
     loss1 = torch.cat((loss1a, loss1b))
 
-    ##Second mixup term. First mini-batch part. Unsupervised + supervised loss separated
-    loss2a = -(1.0 - lam1) * mean_log_prob_pos2_unsup[:int(len(mean_log_prob_pos2_unsup) / 2)] - (1.0 - lam1) * mean_log_prob_pos2_sup[:int(len(mean_log_prob_pos2_sup) / 2)]
-    ##Second mixup term. Second mini-batch part. Unsupervised + supervised loss separated
-    loss2b = -(1.0 - lam2) * mean_log_prob_pos2_unsup[int(len(mean_log_prob_pos2_unsup) / 2):] - (1.0 - lam2) * mean_log_prob_pos2_sup[int(len(mean_log_prob_pos2_sup) / 2):]
-    ## All losses secondfor first mixup term
+    # Second mixup term. First mini-batch part.
+    # Unsupervised + supervised loss separated
+    loss2a = (
+        -(1.0 - lam1) *
+        mean_log_prob_pos2_unsup[:int(len(mean_log_prob_pos2_unsup) / 2)] -
+        (1.0 - lam1) *
+        mean_log_prob_pos2_sup[:int(len(mean_log_prob_pos2_sup) / 2)]
+    )
+
+    # Second mixup term. Second mini-batch part.
+    # Unsupervised + supervised loss separated
+    loss2b = (
+        -(1.0 - lam2) *
+        mean_log_prob_pos2_unsup[int(len(mean_log_prob_pos2_unsup) / 2):] -
+        (1.0 - lam2) *
+        mean_log_prob_pos2_sup[int(len(mean_log_prob_pos2_sup) / 2):]
+    )
+
+    # All losses secondfor first mixup term
     loss2 = torch.cat((loss2a, loss2b))
 
-    ## Final loss (summation of mixup terms after weighting)
+    # Final loss (summation of mixup terms after weighting)
     loss = loss1 + loss2
 
     loss = loss.view(2, bsz).mean(dim=0)
-    
-    loss = ((maskSup[:bsz].sum(1))>0)*(loss.view(bsz))
+
+    loss = ((maskSup[:bsz].sum(1)) > 0) * (loss.view(bsz))
     return loss.mean()
 
 

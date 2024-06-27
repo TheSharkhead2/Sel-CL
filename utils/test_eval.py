@@ -5,6 +5,9 @@ import torch.nn.functional as F
 import numpy as np
 from criterion import *
 
+# import wandb
+
+
 def test_eval(args, model, device, test_loader):
     model.eval()
     loss_per_batch = []
@@ -21,21 +24,38 @@ def test_eval(args, model, device, test_loader):
             output = F.log_softmax(output, dim=1)
             test_loss += F.nll_loss(output, target, reduction='sum').item()
             loss_per_batch.append(F.nll_loss(output, target).item())
-            #pred = output.max(1, keepdim=True)[1] # get the index of the max log-probability
+            # pred = output.max(1, keepdim=True)[1] # get the index of the max log-probability
             result = accuracy_v3(output, target, top=[1,5])
             correct_1 += result[0].item()
             correct_5 += result[1].item()
-            #correct += pred.eq(target.view_as(pred)).sum().item()
+            # correct += pred.eq(target.view_as(pred)).sum().item()
 
     test_loss /= len(test_loader.dataset)
-    print('\nTest set prediction branch: Average loss: {:.4f}, top1 Accuracy: {}/{} ({:.2f}%)\n'.format(
-        test_loss, correct_1, len(test_loader.dataset),
-        100. * correct_1 / len(test_loader.dataset)))
-    print('\nTest set prediction branch: Average loss: {:.4f}, top5 Accuracy: {}/{} ({:.2f}%)\n'.format(
-        test_loss, correct_5, len(test_loader.dataset),
-        100. * correct_5 / len(test_loader.dataset)))
-        
+    print((
+        '\nTest set prediction branch: Average loss: {:.4f},'
+        ' top1 Accuracy: {}/{} ({:.2f}%)\n').format(
+            test_loss,
+            correct_1,
+            len(test_loader.dataset),
+            100. * correct_1 / len(test_loader.dataset)
+        )
+    )
+    print((
+        '\nTest set prediction branch: Average loss: {:.4f},'
+        ' top5 Accuracy: {}/{} ({:.2f}%)\n').format(
+            test_loss,
+            correct_5,
+            len(test_loader.dataset),
+            100. * correct_5 / len(test_loader.dataset)
+        )
+    )
+
     loss_per_epoch = np.average(loss_per_batch)
     acc_val_per_epoch = np.array(100. * correct_1 / len(test_loader.dataset))
 
-    return (loss_per_epoch, acc_val_per_epoch)
+    return (
+        loss_per_epoch,
+        acc_val_per_epoch,
+        100 * correct_1 / len(test_loader.dataset),  # top-1 acc
+        100 * correct_5 / len(test_loader.dataset),  # top-5 acc
+    )
