@@ -216,7 +216,7 @@ class ResNet(nn.Module):
                     nn.init.constant_(m.bn3.weight, 0)
                 elif isinstance(m, BasicBlock):
                     nn.init.constant_(m.bn2.weight, 0)
-                    
+
     def _make_layer(self, block, planes, num_blocks, stride):
         strides = [stride] + [1]*(num_blocks-1)
         layers = []
@@ -224,7 +224,7 @@ class ResNet(nn.Module):
             layers.append(block(self.in_planes, planes, stride))
             self.in_planes = planes * block.expansion
         return nn.Sequential(*layers)
-        
+
     @amp.autocast()
     def forward(self, x, feat_classifier=False):
         out = self.conv1(x)

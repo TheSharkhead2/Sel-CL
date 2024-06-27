@@ -6,7 +6,9 @@ import torch
 import torch.nn as nn
 from functools import partial
 
-from timm.models.vision_transformer import VisionTransformer, _cfg
+# from timm.models.vision_transformer import VisionTransformer, _cfg
+from timm.models.vision_transformer import _cfg
+import timm
 from timm.models.registry import register_model
 from timm.models.layers import trunc_normal_
 
@@ -17,6 +19,21 @@ __all__ = [
     'deit_base_distilled_patch16_224', 'deit_base_patch16_384',
     'deit_base_distilled_patch16_384',
 ]
+
+
+class VisionTransformer(timm.models.vision_transformer.VisionTransformer):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def forward(self, x):
+        feats = self.forward_features(x)
+        x = self.forward_head(feats)
+
+        # # reshaping feats to be matrix (2 dims) -- was causing errors
+        # return x, feats.reshape(-1, feats.size(-1))
+
+        avg_patch_embeds = feats[:, 1:, :].mean(dim=1)
+        return x, avg_patch_embeds
 
 
 class DistilledVisionTransformer(VisionTransformer):

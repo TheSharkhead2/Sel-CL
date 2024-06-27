@@ -21,11 +21,36 @@ from queue_with_pro import *
 from kNN_test import kNN
 from MemoryMoCo import MemoryMoCo
 from other_utils import *
-import models_webvision as mod
+# import models_webvision as mod
+from models import models as mod
 from lr_scheduler import get_scheduler
 
 def parse_args():
     parser = argparse.ArgumentParser(description='command for the first train')
+
+    parser.add_argument(
+        '--model', default='deit_base_patch16_224', type=str, metavar='MODEL',
+        help='Name of model to train',
+        choices=[
+            "deit_tiny_patch16_224",
+            "deit_small_patch16_224",
+            "deit_base_patch16_224",
+            "deit_tiny_distilled_patch16_224",
+            "deit_small_distilled_patch16_224",
+            "deit_base_distilled_patch16_224",
+            "deit_base_patch16_384",
+            "deit_base_distilled_patch16_384"
+        ]
+    )
+    parser.add_argument('--drop', type=float, default=0.0, metavar='PCT',
+                        help='Dropout rate (default: 0.)')
+    parser.add_argument('--drop-path', type=float, default=0.1, metavar='PCT',
+                        help='Drop path rate (default: 0.1)')
+    parser.add_argument('--input-size', default=224,
+                        type=int, help='images input size')
+    parser.add_argument("--root", type=str)
+
+    
     parser.add_argument('--epoch', type=int, default=130, help='training epoches')
     parser.add_argument('--warmup_way', type=str, default="sup", help='uns, sup')
     parser.add_argument('--warmup-epoch', type=int, default=5, help='warmup epoch') 
@@ -45,7 +70,12 @@ def parse_args():
     parser.add_argument('--num_classes', type=int, default=50, help='Number of in-distribution classes')
     parser.add_argument('--wd', type=float, default=1e-4, help='weight decay')
     parser.add_argument('--momentum', default=0.9, type=float, help='momentum')
-    parser.add_argument('--dataset', type=str, default='CIFAR-10', help='CIFAR-10, CIFAR-100')    
+    parser.add_argument(
+        '--dataset', type=str, default='inat100k', help='helpful help',
+        choices=[
+            "inat100k"
+        ]
+    )
     parser.add_argument('--trainval_root', default='./dataset/webvision-50/', help='root for trainval data')
     parser.add_argument('--val_root', default='./dataset/imagenet/', help='root for imagenet val data')
     parser.add_argument('--out', type=str, default='./out/', help='Directory of the output')
@@ -75,6 +105,7 @@ def parse_args():
     args = parser.parse_args()
     return args
 
+
 def data_config(args, transform_train, transform_test):
 
     trainset, testset, imagenet_set = get_dataset(args, TwoCropTransform(transform_train), transform_test)
@@ -86,13 +117,83 @@ def data_config(args, transform_train, transform_test):
 
     return train_loader, test_loader, imagenet_test_loader, trainset
 
+
+def create_model(args):
+    if args.model == "deit_tiny_patch16_224":
+        return mod.deit_tiny_patch16_224(
+            num_classes=args.num_classes,
+            drop_rate=args.drop,
+            drop_path_rate=args.drop_path,
+            # drop_block_rate=None,
+            img_size=args.input_size,
+        )
+    elif args.model == "deit_small_patch16_224":
+        return mod.deit_small_patch16_224(
+            num_classes=args.num_classes,
+            drop_rate=args.drop,
+            drop_path_rate=args.drop_path,
+            # drop_block_rate=None,
+            img_size=args.input_size,
+        )
+    elif args.model == "deit_base_patch16_224":
+        return mod.deit_base_patch16_224(
+            num_classes=args.num_classes,
+            drop_rate=args.drop,
+            drop_path_rate=args.drop_path,
+            # drop_block_rate=None,
+            img_size=args.input_size,
+        )
+    elif args.model == "deit_base_patch16_384":
+        return mod.deit_base_distilled_patch16_384(
+            num_classes=args.num_classes,
+            drop_rate=args.drop,
+            drop_path_rate=args.drop_path,
+            # drop_block_rate=None,
+            img_size=args.input_size,
+        )
+    elif args.model == "deit_tiny_distilled_patch16_224":
+        return mod.deit_tiny_distilled_patch16_224(
+            num_classes=args.num_classes,
+            drop_rate=args.drop,
+            drop_path_rate=args.drop_path,
+            # drop_block_rate=None,
+            img_size=args.input_size,
+        )
+    elif args.model == "deit_small_distilled_patch16_224":
+        return mod.deit_small_distilled_patch16_224(
+            num_classes=args.num_classes,
+            drop_rate=args.drop,
+            drop_path_rate=args.drop_path,
+            # drop_block_rate=None,
+            img_size=args.input_size,
+        )
+    elif args.model == "deit_base_distilled_patch16_224":
+        return mod.deit_base_distilled_patch16_224(
+            num_classes=args.num_classes,
+            drop_rate=args.drop,
+            drop_path_rate=args.drop_path,
+            # drop_block_rate=None,
+            img_size=args.input_size,
+        )
+    elif args.model == "deit_base_distilled_patch16_384":
+        return mod.deit_base_distilled_distilled_patch16_384(
+            num_classes=args.num_classes,
+            drop_rate=args.drop,
+            drop_path_rate=args.drop_path,
+            # drop_block_rate=None,
+            img_size=args.input_size,
+        )
+
 def build_model(args,device):
-    model = mod.ResNet18(num_classes=args.num_classes, low_dim=args.low_dim, head=args.headType).to(device)
+    # model = mod.ResNet18(num_classes=args.num_classes, low_dim=args.low_dim, head=args.headType).to(device)
+    model = create_model(args).to(device)
     model = nn.DataParallel(model)
-    model_ema = mod.ResNet18(num_classes=args.num_classes, low_dim=args.low_dim, head=args.headType).to(device)
+    # model_ema = mod.ResNet18(num_classes=args.num_classes, low_dim=args.low_dim, head=args.headType).to(device)
+    model_ema = create_model(args).to(device)
     model_ema = nn.DataParallel(model_ema)
+
     print('Total params: {:.2f} M'.format((sum(p.numel() for p in model.parameters()) / 1000000.0)))
-    
+
     # copy weights from `model' to `model_ema'
     moment_update(model, model_ema, 0)
     #model_ema = None
@@ -110,7 +211,7 @@ def main(args):
 
     if not os.path.isdir(exp_path):
         os.makedirs(exp_path)
-                            
+
     __console__=sys.stdout
     name= "/results"
     log_file=open(res_path+name+".log",'a')
@@ -130,9 +231,15 @@ def main(args):
     random.seed(args.seed_initialization)  # python seed for image transformation
 
 
-    mean = [0.485, 0.456, 0.406]
-    std = [0.229, 0.224, 0.225]
-    
+    # mean = [0.485, 0.456, 0.406]
+    # std = [0.229, 0.224, 0.225]
+    if args.dataset == "inat100k":
+        # 123.3945866481466, 126.3885961963497, 107.48126061777886
+        mean = [0.4839, 0.4956, 0.4215]
+        # 55.34541875861789, 54.35099612029171, 62.73211140831446
+        std = [0.2170, 0.2131, 0.2460]
+
+
     transform_train = transforms.Compose([
         transforms.Resize(256),
         transforms.RandomResizedCrop(224, scale = (0.2, 1)),
@@ -148,19 +255,21 @@ def main(args):
                 transforms.CenterCrop(224),
                 transforms.ToTensor(),
                 transforms.Normalize(mean, std),
-            ])  
+            ])
 
     # data loader
-    num_classes = args.num_classes
 
-    train_loader, test_loader, imagenet_test_loader, trainset = data_config(args, transform_train, transform_test)
+    train_loader, test_loader, imagenet_test_loader, trainset = data_config(
+                                    args, transform_train, transform_test)
+
+    num_classes = args.num_classes
 
     model, model_ema = build_model(args,device)
     uns_contrast = MemoryMoCo(args.low_dim, args.uns_queue_k, args.uns_t, thresh=0).cuda()
 
     optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.wd)
     scheduler = get_scheduler(optimizer, len(train_loader), args)
-    
+
     if args.sup_queue_use == 1:
         queue = queue_with_pro(args, device)
     else:
@@ -179,7 +288,7 @@ def main(args):
         else:
             train_selected_loader = torch.utils.data.DataLoader(trainset, batch_size=args.batch_size, num_workers=4, pin_memory=True, sampler=torch.utils.data.WeightedRandomSampler(selected_examples, len(selected_examples)))
             train_sel(args, scheduler,model,model_ema,uns_contrast,queue,device, train_loader, train_selected_loader, optimizer, epoch,selected_pairs,log_file)
-      
+
 
         if (epoch%10==0) or (epoch == args.epoch):
             acc, acc5 = kNN(args, epoch, model, None, train_loader, test_loader, 200, 0.1, True)
@@ -188,11 +297,11 @@ def main(args):
                 best_acc5 = acc5
             print('KNN top-1 precion: {:.4f} {:.4f}, best is: {:.4f} {:.4f}'.format(acc*100., \
                 acc5*100., args.best_acc*100., best_acc5*100))
-        
+
         if(epoch>=args.warmup_epoch):        
             print('######## Pair-wise selection ########')
             selected_examples,selected_pairs = pair_selection(args, model, device, train_loader, test_loader, epoch)
-        
+
         test_eval(args, model, device, test_loader)
         test_eval(args, model, device, imagenet_test_loader)
 

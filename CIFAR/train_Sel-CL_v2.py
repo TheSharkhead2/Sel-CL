@@ -315,7 +315,7 @@ def main(args):
     args.best_acc = 0
     best_acc5 = 0
     best_acc_val = 0.0
-    os.environ['CUDA_VISIBLE_DEVICES'] = str(args.cuda_dev)
+    #os.environ['CUDA_VISIBLE_DEVICES'] = str(args.cuda_dev)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     torch.backends.cudnn.deterministic = True  # fix the GPU to deterministic mode

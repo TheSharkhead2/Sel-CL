@@ -21,7 +21,7 @@ class queue_with_pro:
             return self.feats[:self.ptr], self.pros[:self.ptr], self.indices[:self.ptr]
 
 
-    def enqueue_dequeue(self, feats, pros,indices):
+    def enqueue_dequeue(self, feats, pros, indices):
         q_size = len(indices)
 
         if self.ptr + q_size > self.K:
