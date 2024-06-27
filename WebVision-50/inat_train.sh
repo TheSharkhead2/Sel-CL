@@ -4,4 +4,4 @@ CUDA_VISIBLE_DEVICES=1,2,3 python3 train_webvision_Sel-CL.py --epoch 130 --num_c
 --alpha 0.4 --k_val 250 --root /home/aoneill/data/iNat100k --out ./out/ \
 --experiment_name inat100k --alpha_m 1.0 --seed_initialization 1 --seed_dataset 42 \
 --uns_t 100 --uns_queue_k 10000 --lr-warmup-epoch 5 --warmup-epoch 40 --lambda_s 0.01 --lambda_c 1 \
---test_batch_size 100 --beta 0.0 --warmup_way 'sup' --wandb-project "inaturalist"
+--test_batch_size 100 --beta 0.0 --warmup_way 'sup' --wandb-project "inaturalist" --max-logits 10.0

@@ -54,6 +54,9 @@ def parse_args():
     parser.add_argument("--root", type=str)
 
     parser.add_argument("--wandb-project", default="NaN", type=str)
+    parser.add_argument(
+        "--max-logits", type=float, default=10.
+    )
 
     parser.add_argument('--epoch', type=int, default=130,
                         help='training epoches')
