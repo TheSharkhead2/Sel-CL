@@ -462,7 +462,7 @@ def train_sup(
                     device,
                     batch_idx
             )
-            print("sup loss: ", loss_sup)
+            # print("sup loss: ", loss_sup)
 
             if args.sup_queue_use == 1 and epoch > args.sup_queue_begin:
                 # Negatives mask, i.e. all except self-contrast sample
@@ -582,29 +582,44 @@ def pair_selection(args, net, device, trainloader, testloader, epoch):
     # Get train features
     transform_bak = trainloader.dataset.transform
     trainloader.dataset.transform = testloader.dataset.transform
-    temploader = torch.utils.data.DataLoader(trainloader.dataset, batch_size=100, shuffle=False, num_workers=8)
+    temploader = torch.utils.data.DataLoader(
+        trainloader.dataset,
+        batch_size=100,
+        shuffle=False,
+        num_workers=8
+    )
 
     trainFeatures = torch.rand(len(trainloader.dataset), args.low_dim).t().to(device)
-    smiliar_graph_all=torch.zeros(len(trainloader.dataset),len(trainloader.dataset))
+    smiliar_graph_all = torch.zeros(
+        len(trainloader.dataset),
+        len(trainloader.dataset)
+    )
 
     with torch.no_grad():
-        for batch_idx, (inputs, _,_) in enumerate(temploader):
+        for batch_idx, (inputs, _, _) in enumerate(temploader):
             inputs = inputs.to(device)
             batchSize = inputs.size(0)
 
             _, features = net(inputs)
-            # features = net.forward_features(inputs)
 
             trainFeatures[:, batch_idx * batchSize:batch_idx * batchSize + batchSize] = features.data.t()
 
     trainNoisyLabels = torch.LongTensor(temploader.dataset.targets).to(device)
     train_new_labels = torch.LongTensor(temploader.dataset.targets).to(device)
 
-    discrepancy_measure1 = torch.zeros((len(temploader.dataset.targets),)).to(device)
-    discrepancy_measure2 = torch.zeros((len(temploader.dataset.targets),)).to(device)
+    discrepancy_measure1 = torch.zeros(
+        (len(temploader.dataset.targets),)
+    ).to(device)
+    discrepancy_measure2 = torch.zeros(
+        (len(temploader.dataset.targets),)
+    ).to(device)
 
-    discrepancy_measure1_pseudo_labels = torch.zeros((len(temploader.dataset.targets),)).to(device)
-    discrepancy_measure2_pseudo_labels = torch.zeros((len(temploader.dataset.targets),)).to(device)
+    discrepancy_measure1_pseudo_labels = torch.zeros(
+        (len(temploader.dataset.targets),)
+    ).to(device)
+    discrepancy_measure2_pseudo_labels = torch.zeros(
+        (len(temploader.dataset.targets),)
+    ).to(device)
 
     agreement_measure = torch.zeros((len(temploader.dataset.targets),))
 
@@ -612,7 +627,7 @@ def pair_selection(args, net, device, trainloader, testloader, epoch):
     with torch.no_grad():
         retrieval_one_hot_train = torch.zeros(args.k_val, C).to(device)
 
-        for batch_idx, (inputs,targets, index) in enumerate(temploader):
+        for batch_idx, (inputs, targets, index) in enumerate(temploader):
             targets = targets.to(device)
             batchSize = inputs.size(0)
 
@@ -620,20 +635,42 @@ def pair_selection(args, net, device, trainloader, testloader, epoch):
 
             dist = torch.mm(features, trainFeatures)
             smiliar_graph_all[index] = dist.cpu().detach()
-            dist[torch.arange(dist.size()[0]), torch.arange(dist.size()[0])] = -1 ##Self-contrast set to -1
-            #dist[torch.arange(dist.size()[0]), index] = -1
 
-            yd, yi = dist.topk(args.k_val, dim=1, largest=True, sorted=True) ## Top-K similar scores and corresponding indexes
-            candidates = trainNoisyLabels.view(1, -1).expand(batchSize, -1) ##Replicate the labels per row to select
-            retrieval = torch.gather(candidates, 1, yi) ## From replicated labels get those of the top-K neighbours using the index yi (from top-k operation)
+            # Self-contrast set to -1
+            dist[
+                torch.arange(dist.size()[0]),
+                torch.arange(dist.size()[0])
+            ] = -1
+            # dist[torch.arange(dist.size()[0]), index] = -1
 
+            # Top-K similar scores and corresponding indices
+            yd, yi = dist.topk(args.k_val, dim=1, largest=True, sorted=True)
+
+            # Replicate the labels per row to select
+            candidates = trainNoisyLabels.view(1, -1).expand(batchSize, -1)
+
+            # From replicated labels get those of the top-K neighbors using
+            # index yi (from top-k operation)
+            retrieval = torch.gather(candidates, 1, yi)
+
+            # Genearte the K*batchSize one-hot encodings from neighboring
+            # labels ("retrieval"), i.e. each row in retrieval
             retrieval_one_hot_train.resize_(batchSize * args.k_val, C).zero_()
-            ## Generate the K*batchSize one-hot encodings from neighboring labels ("retrieval"), i.e. each row in retrieval
+
             # (set of neighbouring labels) is turned into a one-hot encoding
             retrieval_one_hot_train.scatter_(1, retrieval.view(-1, 1), 1)
-            yd_transform = torch.exp(yd.clone().div_(args.sup_t)) ## Apply temperature to scores
-            yd_transform[...] = 1.0 ##To avoid using similarities
-            probs_corrected = torch.sum(torch.mul(retrieval_one_hot_train.view(batchSize, -1, C), yd_transform.view(batchSize, -1, 1)), 1)
+
+            # apply temperature to scores
+            yd_transform = torch.exp(yd.clone().div_(args.sup_t))
+
+            yd_transform[...] = 1.0  # To avoid using similarities
+            probs_corrected = torch.sum(
+                torch.mul(
+                    retrieval_one_hot_train.view(batchSize, -1, C),
+                    yd_transform.view(batchSize, -1, 1)
+                ),
+                1
+            )
             probs_norm = probs_corrected / torch.sum(probs_corrected, dim=1)[:, None]
 
             prob_temp = probs_norm[torch.arange(0, batchSize), targets]
@@ -668,21 +705,37 @@ def pair_selection(args, net, device, trainloader, testloader, epoch):
                 torch.arange(dist.size()[0]), torch.arange(dist.size()[0])
             ] = -1  # Self-contrast set to -1
 
-            yd, yi = dist.topk(args.k_val, dim=1, largest=True, sorted=True)  ## Top-K similar scores and corresponding indexes
-            candidates = train_new_labels2.view(1, -1).expand(batchSize, -1)  ##Replicate the labels per row to select
-            retrieval = torch.gather(candidates, 1, yi)  ## From replicated labels get those of the top-K neighbours using the index yi (from top-k operation)
+            # Top-K similar scores and corresponding indices
+            yd, yi = dist.topk(args.k_val, dim=1, largest=True, sorted=True)
+
+            # Replicate the labels per row to select
+            candidates = train_new_labels2.view(1, -1).expand(batchSize, -1)
+
+            # From replicated labels get those of the top-K neighbours using
+            # the index yi (frmo top-k operation)
+            retrieval = torch.gather(candidates, 1, yi)
 
             retrieval_one_hot_train.resize_(batchSize * args.k_val, C).zero_()
             retrieval_one_hot_train.scatter_(1, retrieval.view(-1, 1), 1)
-            yd_transform = torch.exp(yd.clone().div_(args.sup_t))  ## Apply temperature to scores
-            yd_transform[...] = 1.0  ##To avoid using similarities only counts
+
+            # Apply temperature to scores
+            yd_transform = torch.exp(yd.clone().div_(args.sup_t))
+
+            # To avoid using similarities only counts
+            yd_transform[...] = 1.0
+
             probs_corrected = torch.sum(
-                torch.mul(retrieval_one_hot_train.view(batchSize, -1, C), yd_transform.view(batchSize, -1, 1)), 1)
+                torch.mul(
+                    retrieval_one_hot_train.view(batchSize, -1, C),
+                    yd_transform.view(batchSize, -1, 1)
+                ),
+                1
+            )
 
             probs_norm = probs_corrected / torch.sum(probs_corrected, dim=1)[:, None]
 
             prob_temp = probs_norm[torch.arange(0, batchSize), targets]
-            prob_temp[prob_temp<=1e-2] = 1e-2
+            prob_temp[prob_temp <= 1e-2] = 1e-2
             prob_temp[prob_temp > (1-1e-2)] = 1-1e-2
 
             discrepancy_measure2[index] = -torch.log(prob_temp)
@@ -692,12 +745,14 @@ def pair_selection(args, net, device, trainloader, testloader, epoch):
             prob_temp[prob_temp > (1 - 1e-2)] = 1 - 1e-2
             discrepancy_measure2_pseudo_labels[index] = -torch.log(prob_temp)
 
-            agreement_measure[index.data.cpu()] = (torch.max(probs_norm, dim=1)[1]==targets).float().data.cpu()
+            agreement_measure[index.data.cpu()] = (
+                torch.max(probs_norm, dim=1)[1] == targets
+            ).float().data.cpu()
 
     # select examples
     num_clean_per_class = torch.zeros(args.num_classes)
     for i in range(args.num_classes):
-        idx_class = temploader.dataset.targets==i
+        idx_class = temploader.dataset.targets == i
         idx_class = torch.from_numpy(idx_class.astype("float")) == 1.0
         num_clean_per_class[i] = torch.sum(agreement_measure[idx_class])
 
@@ -708,44 +763,84 @@ def pair_selection(args, net, device, trainloader, testloader, epoch):
     elif (args.alpha == 0.0):
         num_samples2select_class = torch.min(num_clean_per_class)
     else:
-        num_samples2select_class = torch.quantile(num_clean_per_class,args.alpha)
+        num_samples2select_class = torch.quantile(
+            num_clean_per_class,
+            args.alpha
+        )
 
-    agreement_measure = torch.zeros((len(temploader.dataset.targets),)).to(device)
+    agreement_measure = torch.zeros(
+        (len(temploader.dataset.targets),)
+    ).to(device)
 
     for i in range(args.num_classes):
-        idx_class = temploader.dataset.targets==i
+        idx_class = temploader.dataset.targets == i
         samplesPerClass = idx_class.sum()
         idx_class = torch.from_numpy(idx_class.astype("float"))
-        idx_class = (idx_class==1.0).nonzero().squeeze()
+        idx_class = (idx_class == 1.0).nonzero().squeeze().to(device)
         discrepancy_class = discrepancy_measure2[idx_class]
 
-        if num_samples2select_class>=samplesPerClass:
+        if num_samples2select_class >= samplesPerClass:
             k_corrected = samplesPerClass
         else:
             k_corrected = num_samples2select_class
 
-        top_clean_class_relative_idx = torch.topk(discrepancy_class, k=int(k_corrected), largest=False, sorted=False)[1]
+        top_clean_class_relative_idx = torch.topk(
+            discrepancy_class,
+            k=int(k_corrected),
+            largest=False,
+            sorted=False
+        )[1].to(device)
 
         agreement_measure[idx_class[top_clean_class_relative_idx]] = 1.0
 
     selected_examples = agreement_measure
     print('selected examples', sum(selected_examples))
     trainloader.dataset.transform = transform_bak
+
     # select pairs
     with torch.no_grad():
-        index_selected = torch.nonzero(selected_examples,as_tuple=True)[0].cpu()
+        index_selected = torch.nonzero(
+            selected_examples,
+            as_tuple=True
+        )[0].cpu()
         total_selected_num = len(index_selected)
         trainNoisyLabels = trainNoisyLabels.cpu().unsqueeze(1)
         total_num = len(trainNoisyLabels)
         noisy_pairs = torch.eq(trainNoisyLabels, trainNoisyLabels.t())
 
-        selected_pairs = noisy_pairs[index_selected.unsqueeze(1).expand(total_selected_num,total_selected_num),index_selected.unsqueeze(0).expand(total_selected_num,total_selected_num)].clone()
-        temp_graph = smiliar_graph_all[index_selected.unsqueeze(1).expand(total_selected_num,total_selected_num),index_selected.unsqueeze(0).expand(total_selected_num,total_selected_num)]         
-        selected_th=np.quantile(temp_graph[selected_pairs],args.beta)
-        print('selected_th',selected_th)
-        temp = torch.zeros(total_num,total_num).type(torch.uint8)
-        noisy_pairs = torch.where(smiliar_graph_all<selected_th,temp,noisy_pairs.type(torch.uint8)).type(torch.bool)
-        noisy_pairs[index_selected.unsqueeze(1).expand(total_selected_num,total_selected_num),index_selected.unsqueeze(0).expand(total_selected_num,total_selected_num)] = selected_pairs
-        final_selected_pairs = noisy_pairs                  
-        
-    return selected_examples.cuda(),final_selected_pairs.contiguous()
+        selected_pairs = noisy_pairs[index_selected.unsqueeze(1).expand(
+            total_selected_num,
+            total_selected_num
+        ), index_selected.unsqueeze(0).expand(
+            total_selected_num,
+            total_selected_num
+        )].clone()
+
+        temp_graph = smiliar_graph_all[index_selected.unsqueeze(1).expand(
+            total_selected_num,
+            total_selected_num
+        ), index_selected.unsqueeze(0).expand(
+            total_selected_num,
+            total_selected_num
+        )]
+        selected_th = np.quantile(temp_graph[selected_pairs], args.beta)
+
+        print('selected_th', selected_th)
+
+        temp = torch.zeros(total_num, total_num).type(torch.uint8)
+        noisy_pairs = torch.where(
+            smiliar_graph_all < selected_th,
+            temp,
+            noisy_pairs.type(torch.uint8)
+        ).type(torch.bool)
+
+        noisy_pairs[index_selected.unsqueeze(1).expand(
+            total_selected_num,
+            total_selected_num
+        ), index_selected.unsqueeze(0).expand(
+            total_selected_num,
+            total_selected_num
+        )] = selected_pairs
+        final_selected_pairs = noisy_pairs
+
+    return selected_examples.cuda(), final_selected_pairs.contiguous()

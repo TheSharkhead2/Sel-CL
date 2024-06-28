@@ -1,4 +1,4 @@
-CUDA_VISIBLE_DEVICES=1,2,3 python3 train_webvision_Sel-CL.py --epoch 130 --num_classes 50 --batch_size 64 --low_dim 768 --lr-scheduler "step"  \
+CUDA_VISIBLE_DEVICES=0,1,2,3 python3 train_webvision_Sel-CL.py --epoch 130 --num_classes 50 --batch_size 128 --low_dim 768 --lr-scheduler "step"  \
 --network "RN18" --lr 5e-4 --wd 1e-4 --dataset "inat100k" \
 --sup_t 100 --headType "Linear"  --sup_queue_use 1 --sup_queue_begin 3 --queue_per_class 200 \
 --alpha 0.4 --k_val 250 --root /home/aoneill/data/iNat100k --out ./out/ \

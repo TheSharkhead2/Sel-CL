@@ -559,7 +559,9 @@ def main(args):
                 os.path.join(exp_path, snapLast+'.pth')
             )
 
-        if (epoch % 10 == 0) or (epoch == args.epoch):
+        if (epoch > args.warmup_epoch) and (
+            (epoch % 10 == 0) or (epoch == args.epoch)
+        ):
             np.save(
                 res_path + '/' + 'selected_examples_train.npy',
                 selected_examples.data.cpu().numpy()

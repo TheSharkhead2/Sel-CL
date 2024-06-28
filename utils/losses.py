@@ -27,6 +27,10 @@ def Supervised_ContrastiveLearning_loss(
 
     exp_logits = torch.exp(logits) * logits_mask  # remove diagonal
 
+    if torch.isnan(exp_logits).any():
+        print("exp_logits has NaN values")
+        print(exp_logits)
+
     if args.aprox == 1:
         # Approximation for numerical stability taken from supervised
         # contrastive learning
@@ -38,6 +42,10 @@ def Supervised_ContrastiveLearning_loss(
         )
 
     exp_logits2 = torch.exp(logits) * logits_mask  # remove diagonal
+
+    if torch.isnan(exp_logits2).any():
+        print("exp_logits2 has NaN values")
+        print(exp_logits2)
 
     if args.aprox == 1:
         # Approximation for numerical stability taken from supervised
