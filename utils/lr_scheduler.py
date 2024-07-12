@@ -1,5 +1,6 @@
 # noinspection PyProtectedMember
-from torch.optim.lr_scheduler import _LRScheduler, MultiStepLR, CosineAnnealingLR
+from torch.optim.lr_scheduler import (
+    _LRScheduler, MultiStepLR, CosineAnnealingLR)
 
 
 # noinspection PyAttributeOutsideInit
@@ -9,11 +10,20 @@ class GradualWarmupScheduler(_LRScheduler):
       Args:
           optimizer (Optimizer): Wrapped optimizer.
           multiplier: init learning rate = base lr / multiplier
-          warmup_epoch: target learning rate is reached at warmup_epoch, gradually
-          after_scheduler: after target_epoch, use this scheduler(eg. ReduceLROnPlateau)
+          warmup_epoch: target learning rate is reached at warmup_epoch,
+              gradually
+          after_scheduler: after target_epoch, use this scheduler
+              (eg. ReduceLROnPlateau)
       """
 
-    def __init__(self, optimizer, multiplier, warmup_epoch, after_scheduler, last_epoch=-1):
+    def __init__(
+        self,
+        optimizer,
+        multiplier,
+        warmup_epoch,
+        after_scheduler,
+        last_epoch=-1
+    ):
         self.multiplier = multiplier
         if self.multiplier <= 1.:
             raise ValueError('multiplier should be greater than 1.')
@@ -26,8 +36,12 @@ class GradualWarmupScheduler(_LRScheduler):
         if self.last_epoch > self.warmup_epoch:
             return self.after_scheduler.get_lr()
         else:
-            return [base_lr / self.multiplier * ((self.multiplier - 1.) * self.last_epoch / self.warmup_epoch + 1.)
-                    for base_lr in self.base_lrs]
+            return [
+                base_lr / self.multiplier * (
+                    (self.multiplier - 1.) *
+                    self.last_epoch / self.warmup_epoch + 1.
+                ) for base_lr in self.base_lrs
+            ]
 
     def step(self, epoch=None):
         if epoch is None:
@@ -45,7 +59,10 @@ class GradualWarmupScheduler(_LRScheduler):
         is not the optimizer.
         """
 
-        state = {key: value for key, value in self.__dict__.items() if key != 'optimizer' and key != 'after_scheduler'}
+        state = {
+            key: value for key, value in self.__dict__.items()
+            if key != 'optimizer' and key != 'after_scheduler'
+        }
         state['after_scheduler'] = self.after_scheduler.state_dict()
         return state
 
@@ -72,9 +89,14 @@ def get_scheduler(optimizer, n_iter_per_epoch, args):
         scheduler = MultiStepLR(
             optimizer=optimizer,
             gamma=args.lr_decay_rate,
-            milestones=[(m - args.lr_warmup_epoch) * n_iter_per_epoch for m in args.lr_decay_epochs])
+            milestones=[
+                (m - args.lr_warmup_epoch) * n_iter_per_epoch
+                for m in args.lr_decay_epochs
+            ]
+        )
     else:
-        raise NotImplementedError(f"scheduler {args.lr_scheduler} not supported")
+        raise NotImplementedError(
+            f"scheduler {args.lr_scheduler} not supported")
 
     if args.lr_warmup_epoch >= 1:
         scheduler = GradualWarmupScheduler(
