@@ -28,11 +28,6 @@ from lr_scheduler import get_scheduler
 import wandb
 
 
-# https://discuss.pytorch.org/t/how-do-i-check-the-number-of-parameters-of-a-model/4325/9
-def count_parameters(model):
-    return sum(p.numel() for p in model.parameters() if p.requires_grad)
-
-
 def parse_args():
     parser = argparse.ArgumentParser(description='command for the first train')
 
@@ -249,7 +244,7 @@ def main(args):
     if not os.path.isdir(exp_path):
         os.makedirs(exp_path)
 
-    __console__=sys.stdout
+    __console__ = sys.stdout
     name = "/results"
     log_file = open(res_path+name+".log", 'a')
     sys.stdout = log_file
@@ -304,8 +299,6 @@ def main(args):
         args, transform_train, transform_test)
 
     model, model_ema = build_model(args, device)
-
-    print("model parameters: ", count_parameters(model))
 
     uns_contrast = MemoryMoCo(
         args.low_dim, args.uns_queue_k, args.uns_t, thresh=0).cuda()
@@ -437,11 +430,11 @@ def main(args):
             args, model, device, imagenet_test_loader)
 
         wandb.log({
-                    "val_top1_acc": val_top1,
-                    "val_top5_acc": val_top5,
-                    "test_top1_acc": test_top1,
-                    "test_top5_acc": test_top5
-                })
+            "val_top1_acc": val_top1,
+            "val_top5_acc": val_top5,
+            "test_top1_acc": test_top1,
+            "test_top5_acc": test_top5
+        })
 
         print('Epoch time: {:.2f} seconds\n'.format(time.time()-st))
         st = time.time()
