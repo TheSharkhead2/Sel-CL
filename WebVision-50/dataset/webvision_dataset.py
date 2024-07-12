@@ -242,8 +242,19 @@ class inat_dataset(Dataset):
 
 
 class webvision_dataset(Dataset):
-    def __init__(self, root_dir, transform, target_transform, mode, num_class, num_samples=None, pred=[], probability=[], paths=[],
-                 log=''):
+    def __init__(
+        self,
+        root_dir,
+        transform,
+        target_transform,
+        mode,
+        num_class,
+        num_samples=None,
+        pred=[],
+        probability=[],
+        paths=[],
+        log=''
+    ):
         self.root = root_dir
         self.transform = transform
         self.target_transform = target_transform

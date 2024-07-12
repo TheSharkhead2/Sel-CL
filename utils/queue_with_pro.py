@@ -1,10 +1,11 @@
 import torch
 
+
 class queue_with_pro:
     def __init__(self, args, device):
         self.K = args.queue_per_class*args.num_classes*2
         self.feats = -1.0 * torch.ones(self.K, args.low_dim).to(device)
-        self.pros =  -1.0 * torch.ones(self.K, args.num_classes).to(device)
+        self.pros = -1.0 * torch.ones(self.K, args.num_classes).to(device)
         self.indices = -1.0 * torch.ones(self.K, dtype=torch.long).to(device)
 
         self.ptr = 0
@@ -18,10 +19,13 @@ class queue_with_pro:
             return self.feats, self.pros, self.indices
 
         else:
-            return self.feats[:self.ptr], self.pros[:self.ptr], self.indices[:self.ptr]
+            return (
+                self.feats[:self.ptr],
+                self.pros[:self.ptr],
+                self.indices[:self.ptr]
+            )
 
-
-    def enqueue_dequeue(self, feats, pros,indices):
+    def enqueue_dequeue(self, feats, pros, indices):
         q_size = len(indices)
 
         if self.ptr + q_size > self.K:
