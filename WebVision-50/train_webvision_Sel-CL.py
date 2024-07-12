@@ -250,9 +250,9 @@ def main(args):
         os.makedirs(exp_path)
 
     __console__=sys.stdout
-    name= "/results"
-    log_file=open(res_path+name+".log",'a')
-    sys.stdout=log_file
+    name = "/results"
+    log_file = open(res_path+name+".log", 'a')
+    sys.stdout = log_file
     print(args)
 
     # best_ac only record the best top1_ac for validation set.
@@ -260,12 +260,14 @@ def main(args):
     best_acc5 = 0
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    torch.backends.cudnn.deterministic = True  # fix the GPU to deterministic mode
+    # fix the GPU to deterministic mode
+    torch.backends.cudnn.deterministic = True
     torch.manual_seed(args.seed_initialization)  # CPU seed
     if device == "cuda":
         torch.cuda.manual_seed_all(args.seed_initialization)  # GPU seed
 
-    random.seed(args.seed_initialization)  # python seed for image transformation
+    # python seed for image transformation
+    random.seed(args.seed_initialization)
 
     if args.dataset == "inat100k":
         # 123.3945866481466, 126.3885961963497, 107.48126061777886
@@ -286,14 +288,14 @@ def main(args):
         transforms.RandomGrayscale(p=0.2),
         transforms.ToTensor(),
         transforms.Normalize(mean, std),
-        ])
+    ])
 
     transform_test = transforms.Compose([
-                transforms.Resize(256),
-                transforms.CenterCrop(224),
-                transforms.ToTensor(),
-                transforms.Normalize(mean, std),
-            ])
+        transforms.Resize(256),
+        transforms.CenterCrop(224),
+        transforms.ToTensor(),
+        transforms.Normalize(mean, std),
+    ])
 
     # data loader
     num_classes = args.num_classes
@@ -326,9 +328,29 @@ def main(args):
         print("=================>    ", args.experiment_name)
         if (epoch <= args.warmup_epoch):
             if (args.warmup_way == 'uns'):
-                train_uns(args, scheduler,model,model_ema,uns_contrast,queue,device, train_loader, optimizer, epoch,log_file)
+                train_uns(
+                    args,
+                    scheduler,
+                    model,
+                    model_ema,
+                    uns_contrast,
+                    queue,
+                    device,
+                    train_loader,
+                    optimizer,
+                    epoch,
+                    log_file
+                )
             else:
-                train_selected_loader = torch.utils.data.DataLoader(trainset, batch_size=args.batch_size, num_workers=4, pin_memory=True, sampler=torch.utils.data.WeightedRandomSampler(torch.ones(len(trainset)), len(trainset)))
+                train_selected_loader = torch.utils.data.DataLoader(
+                    trainset,
+                    batch_size=args.batch_size,
+                    num_workers=4,
+                    pin_memory=True,
+                    sampler=torch.utils.data.WeightedRandomSampler(
+                        torch.ones(len(trainset)), len(trainset)
+                    )
+                )
                 trainNoisyLabels = torch.LongTensor(
                     train_loader.dataset.targets).unsqueeze(1).to(device)
 
@@ -348,21 +370,66 @@ def main(args):
                     log_file
                 )
         else:
-            train_selected_loader = torch.utils.data.DataLoader(trainset, batch_size=args.batch_size, num_workers=4, pin_memory=True, sampler=torch.utils.data.WeightedRandomSampler(selected_examples, len(selected_examples)))
-            train_sel(args, scheduler,model,model_ema,uns_contrast,queue,device, train_loader, train_selected_loader, optimizer, epoch,selected_pairs,log_file)
+            train_selected_loader = torch.utils.data.DataLoader(
+                trainset,
+                batch_size=args.batch_size,
+                num_workers=4,
+                pin_memory=True,
+                sampler=torch.utils.data.WeightedRandomSampler(
+                    selected_examples, len(selected_examples)
+                )
+            )
+            train_sel(
+                args,
+                scheduler,
+                model,
+                model_ema,
+                uns_contrast,
+                queue,
+                device,
+                train_loader,
+                train_selected_loader,
+                optimizer,
+                epoch,
+                selected_pairs,
+                log_file
+            )
 
-
-        if (epoch%10==0) or (epoch == args.epoch):
-            acc, acc5 = kNN(args, epoch, model, None, train_loader, test_loader, 200, 0.1, True)
-            if acc >= args.best_acc: 
+        if (epoch % 10 == 0) or (epoch == args.epoch):
+            acc, acc5 = kNN(
+                args,
+                epoch,
+                model,
+                None,
+                train_loader,
+                test_loader,
+                200,
+                0.1,
+                True
+            )
+            if acc >= args.best_acc:
                 args.best_acc = acc
                 best_acc5 = acc5
-            print('KNN top-1 precion: {:.4f} {:.4f}, best is: {:.4f} {:.4f}'.format(acc*100., \
-                acc5*100., args.best_acc*100., best_acc5*100))
+            print(
+                ('KNN top-1 precion: {:.4f} {:.4f},'
+                 'best is: {:.4f} {:.4f}').format(
+                    acc*100.,
+                    acc5*100.,
+                    args.best_acc*100.,
+                    best_acc5*100
+                )
+            )
 
-        if(epoch>=args.warmup_epoch):        
+        if (epoch >= args.warmup_epoch):
             print('######## Pair-wise selection ########')
-            selected_examples,selected_pairs = pair_selection(args, model, device, train_loader, test_loader, epoch)
+            selected_examples, selected_pairs = pair_selection(
+                args,
+                model,
+                device,
+                train_loader,
+                test_loader,
+                epoch
+            )
 
         _, _, val_top1, val_top5 = test_eval(
             args, model, device, test_loader)
@@ -380,19 +447,42 @@ def main(args):
         st = time.time()
         log_file.flush()
 
-        if (epoch %10 ==0):
+        if (epoch % 10 == 0):
             snapLast = "Sel-CL_model"
-            torch.save(model.state_dict(), os.path.join(exp_path, snapLast + '_'+str(epoch)+'epoch.pth'))
-            torch.save(model_ema.state_dict(), os.path.join(exp_path, snapLast + '_ema_'+str(epoch)+'epoch.pth'))
-            torch.save(scheduler.state_dict(), os.path.join(exp_path, 'scheduler_'+str(epoch)+'epoch.pth'))
-            torch.save(uns_contrast, os.path.join(exp_path, 'uns_contrast_'+str(epoch)+'epoch.pth'))
-            torch.save(queue, os.path.join(exp_path, 'queue_'+str(epoch)+'epoch.pth'))
+            torch.save(
+                model.state_dict(),
+                os.path.join(exp_path, snapLast + '_'+str(epoch)+'epoch.pth')
+            )
+            torch.save(
+                model_ema.state_dict(),
+                os.path.join(
+                    exp_path, snapLast + '_ema_'+str(epoch)+'epoch.pth'
+                )
+            )
+            torch.save(
+                scheduler.state_dict(),
+                os.path.join(exp_path, 'scheduler_'+str(epoch)+'epoch.pth')
+            )
+            torch.save(
+                uns_contrast,
+                os.path.join(exp_path, 'uns_contrast_'+str(epoch)+'epoch.pth')
+            )
+            torch.save(
+                queue,
+                os.path.join(exp_path, 'queue_'+str(epoch)+'epoch.pth')
+            )
 
-        if(epoch == args.epoch):
-            torch.save(model.state_dict(), os.path.join(exp_path, snapLast+'.pth'))
+        if (epoch == args.epoch):
+            torch.save(
+                model.state_dict(),
+                os.path.join(exp_path, snapLast+'.pth')
+            )
 
-        if (epoch%10==0) or (epoch == args.epoch):
-            np.save(res_path + '/' + 'selected_examples_train.npy', selected_examples.data.cpu().numpy())
+        if (epoch % 10 == 0) or (epoch == args.epoch):
+            np.save(
+                res_path + '/' + 'selected_examples_train.npy',
+                selected_examples.data.cpu().numpy()
+            )
 
 
 if __name__ == "__main__":
