@@ -1,5 +1,5 @@
 CUDA_VISIBLE_DEVICES=0,1,2,3 python3 train_webvision_Sel-CL.py --epoch 130 --num_classes 1000 --batch_size 64 --low_dim 128 --lr-scheduler "step"  \
---network "RN101" --lr 0.1 --wd 1e-4 --dataset "inat100k" --root /home/aoneill/data/iNat100k \
+--network "PARN18" --lr 0.1 --wd 1e-4 --dataset "inat100k" --root /home/aoneill/data/iNat100k \
 --sup_t 0.1 --headType "Linear"  --sup_queue_use 1 --sup_queue_begin 3 --queue_per_class 200 \
 --alpha 0.4 --k_val 250 --out /home/trode/selcl/out/ \
 --experiment_name inat100k_selcl --alpha_m 1.0 --seed_initialization 1 --seed_dataset 42 \

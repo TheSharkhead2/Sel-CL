@@ -190,14 +190,43 @@ def data_config(args, transform_train, transform_test):
 
 
 def build_model(args, device):
-    model = mod.PreActResNet50(
-        num_classes=args.num_classes, low_dim=args.low_dim, head=args.headType
-    ).to(device)
+    if args.network == "RN18":
+        model = mod.ResNet18(
+            num_classes=args.num_classes,
+            low_dim=args.low_dim,
+            head=args.headType
+        ).to(device)
+        model_ema = mod.ResNet18(
+            num_classes=args.num_classes,
+            low_dim=args.low_dim,
+            head=args.headType
+        ).to(device)
+    elif args.network == "PARN18":
+        model = mod.PreActResNet18(
+            num_classes=args.num_classes,
+            low_dim=args.low_dim,
+            head=args.headType
+        ).to(device)
+        model_ema = mod.PreActResNet18(
+            num_classes=args.num_classes,
+            low_dim=args.low_dim,
+            head=args.headType
+        ).to(device)
+    elif args.network == "PARN50":
+        model = mod.PreActResNet50(
+            num_classes=args.num_classes,
+            low_dim=args.low_dim,
+            head=args.headType
+        ).to(device)
+        model_ema = mod.PreActResNet50(
+            num_classes=args.num_classes,
+            low_dim=args.low_dim,
+            head=args.headType
+        ).to(device)
+
     model = nn.DataParallel(model)
-    model_ema = mod.PreActResNet50(
-        num_classes=args.num_classes, low_dim=args.low_dim, head=args.headType
-    ).to(device)
     model_ema = nn.DataParallel(model_ema)
+
     print(
         'Total params: {:.2f} M'.format(
             (
