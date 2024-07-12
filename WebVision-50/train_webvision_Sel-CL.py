@@ -366,7 +366,7 @@ def main(args):
 
         _, _, val_top1, val_top5 = test_eval(
             args, model, device, test_loader)
-        _, _, val_top1, val_top5 = test_eval(
+        _, _, test_top1, test_top5 = test_eval(
             args, model, device, imagenet_test_loader)
 
         wandb.log({

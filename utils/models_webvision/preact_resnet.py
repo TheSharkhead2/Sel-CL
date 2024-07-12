@@ -170,10 +170,19 @@ class PreActBottleneck(nn.Module):
 
 
 class ResNet(nn.Module):
-    def __init__(self, block, num_blocks, head, num_classes, low_dim, normlinear=False,zero_init_residual=False):
+    def __init__(
+        self,
+        block,
+        num_blocks,
+        head,
+        num_classes,
+        low_dim,
+        normlinear=False,
+        zero_init_residual=False
+    ):
         super(ResNet, self).__init__()
         self.in_planes = 64
-        self.conv1 = conv3x3(3,64)
+        self.conv1 = conv3x3(3, 64)
         self.bn1 = nn.BatchNorm2d(64)
         self.layer1 = self._make_layer(block, 64, num_blocks[0], stride=1)
         self.layer2 = self._make_layer(block, 128, num_blocks[1], stride=2)
@@ -182,22 +191,21 @@ class ResNet(nn.Module):
 
         self.linear2 = nn.Linear(512 * block.expansion, num_classes)
 
-        
-        #self.linear = nn.Linear(512*block.expansion, low_dim)
-        if(head=='Linear'):
+        # self.linear = nn.Linear(512*block.expansion, low_dim)
+        if (head == 'Linear'):
             self.head = nn.Linear(512*block.expansion, low_dim)
         else:
             self.head = nn.Sequential(
                 nn.Linear(512*block.expansion, 512*block.expansion),
                 nn.ReLU(inplace=True),
                 nn.Linear(512*block.expansion, low_dim)
-            )        
+            )
         # for m in self.modules():
-            # if isinstance(m, nn.Conv2d):
-                # nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
-            # elif isinstance(m, (nn.BatchNorm2d, nn.GroupNorm)):
-                # nn.init.constant_(m.weight, 1)
-                # nn.init.constant_(m.bias, 0)
+        #   # if isinstance(m, nn.Conv2d):
+        #       # nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+        #   # elif isinstance(m, (nn.BatchNorm2d, nn.GroupNorm)):
+        #       # nn.init.constant_(m.weight, 1)
+        #       # nn.init.constant_(m.bias, 0)
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
@@ -216,7 +224,7 @@ class ResNet(nn.Module):
                     nn.init.constant_(m.bn3.weight, 0)
                 elif isinstance(m, BasicBlock):
                     nn.init.constant_(m.bn2.weight, 0)
-                    
+
     def _make_layer(self, block, planes, num_blocks, stride):
         strides = [stride] + [1]*(num_blocks-1)
         layers = []
@@ -224,7 +232,7 @@ class ResNet(nn.Module):
             layers.append(block(self.in_planes, planes, stride))
             self.in_planes = planes * block.expansion
         return nn.Sequential(*layers)
-        
+
     @amp.autocast()
     def forward(self, x, feat_classifier=False):
         out = self.conv1(x)
@@ -236,36 +244,59 @@ class ResNet(nn.Module):
         out = self.layer4(out)
         out = F.adaptive_avg_pool2d(out, (1, 1))
         out_ = out.view(out.size(0), -1)
-        if(feat_classifier):
+        if (feat_classifier):
             return out_
         outContrast = self.head(out_)
         outContrast = F.normalize(outContrast, dim=1)
         outPred = self.linear2(out_)
         return outPred, outContrast
-            
+
+
 def PreActResNet18(num_classes, low_dim, head, normlinear=False):
-    return ResNet(PreActBlock, [2, 2, 2, 2], head=head, num_classes=num_classes, low_dim=low_dim, normlinear=normlinear)
+    return ResNet(
+        PreActBlock,
+        [2, 2, 2, 2],
+        head=head,
+        num_classes=num_classes,
+        low_dim=low_dim,
+        normlinear=normlinear
+    )
+
 
 def ResNet18(num_classes, low_dim, head, normlinear=False):
-    return ResNet(BasicBlock, [2, 2, 2, 2], head=head, num_classes=num_classes, low_dim=low_dim, normlinear=normlinear)
-    
+    return ResNet(
+        BasicBlock,
+        [2, 2, 2, 2],
+        head=head,
+        num_classes=num_classes,
+        low_dim=low_dim,
+        normlinear=normlinear
+    )
+
+
 def ResNet34(num_classes):
-    return ResNet(BasicBlock, [3,4,6,3], num_classes=num_classes)
+    return ResNet(BasicBlock, [3, 4, 6, 3], num_classes=num_classes)
+
 
 def ResNet50(num_classes):
-    return ResNet(Bottleneck, [3,4,6,3], num_classes=num_classes)
+    return ResNet(Bottleneck, [3, 4, 6, 3], num_classes=num_classes)
+
 
 def ResNet101(num_classes):
-    return ResNet(Bottleneck, [3,4,23,3], num_classes=num_classes)
+    return ResNet(Bottleneck, [3, 4, 23, 3], num_classes=num_classes)
+
 
 def ResNet152(num_classes):
-    return ResNet(Bottleneck, [3,8,36,3], num_classes=num_classes)
-    
+    return ResNet(Bottleneck, [3, 8, 36, 3], num_classes=num_classes)
+
+
 class LinearClassifier(nn.Module):
     """Linear classifier"""
+
     def __init__(self, feat_dim=512, num_classes=10):
         super(LinearClassifier, self).__init__()
         self.fc = nn.Linear(feat_dim, num_classes)
+
     @amp.autocast()
     def forward(self, features):
         return self.fc(features)
