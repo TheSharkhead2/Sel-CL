@@ -195,11 +195,11 @@ def data_config(args, transform_train, transform_test):
 
 
 def build_model(args, device):
-    model = mod.PreActResNet18(
+    model = mod.PreActResNet101(
         num_classes=args.num_classes, low_dim=args.low_dim, head=args.headType
     ).to(device)
     model = nn.DataParallel(model)
-    model_ema = mod.PreActResNet18(
+    model_ema = mod.PreActResNet101(
         num_classes=args.num_classes, low_dim=args.low_dim, head=args.headType
     ).to(device)
     model_ema = nn.DataParallel(model_ema)
