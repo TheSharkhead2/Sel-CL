@@ -7,7 +7,7 @@ import argparse
 import os
 import time
 from datetime import datetime
-from dataset.webvision_dataset import *
+from dataset.webvision_dataset import get_dataset
 
 import torch.utils.data as data
 from torch import optim
@@ -16,12 +16,12 @@ import random
 import sys
 
 sys.path.append('../utils')
-from utils_noise_webvision import *
+from utils_noise_webvision import train_sel, train_uns, train_sup, pair_selection
 from test_eval import test_eval
-from queue_with_pro import *
+from queue_with_pro import queue_with_pro
 from kNN_test import kNN
 from MemoryMoCo import MemoryMoCo
-from other_utils import *
+from other_utils import save_model, TwoCropTransform, TwoTransform, tofloat, set_bn_train, moment_update
 import models_webvision as mod
 from lr_scheduler import get_scheduler
 
