@@ -329,8 +329,24 @@ def main(args):
                 train_uns(args, scheduler,model,model_ema,uns_contrast,queue,device, train_loader, optimizer, epoch,log_file)
             else:
                 train_selected_loader = torch.utils.data.DataLoader(trainset, batch_size=args.batch_size, num_workers=4, pin_memory=True, sampler=torch.utils.data.WeightedRandomSampler(torch.ones(len(trainset)), len(trainset)))
-                trainNoisyLabels = torch.LongTensor(train_loader.dataset.targets).unsqueeze(1)
-                train_sup(args, scheduler,model,model_ema,uns_contrast,queue,device, train_loader, train_selected_loader, optimizer, epoch,torch.eq(trainNoisyLabels, trainNoisyLabels.t()),log_file)
+                trainNoisyLabels = torch.LongTensor(
+                    train_loader.dataset.targets).unsqueeze(1).to(device)
+
+                train_sup(
+                    args,
+                    scheduler,
+                    model,
+                    model_ema,
+                    uns_contrast,
+                    queue,
+                    device,
+                    train_loader,
+                    train_selected_loader,
+                    optimizer,
+                    epoch,
+                    torch.eq(trainNoisyLabels, trainNoisyLabels.t()),
+                    log_file
+                )
         else:
             train_selected_loader = torch.utils.data.DataLoader(trainset, batch_size=args.batch_size, num_workers=4, pin_memory=True, sampler=torch.utils.data.WeightedRandomSampler(selected_examples, len(selected_examples)))
             train_sel(args, scheduler,model,model_ema,uns_contrast,queue,device, train_loader, train_selected_loader, optimizer, epoch,selected_pairs,log_file)

@@ -79,14 +79,15 @@ def unsupervised_masks_estimation(args, queue, mix_index1, mix_index2, epoch, bs
     return maskUnsup_batch, maskUnsup_mem, mask2Unsup_batch, mask2Unsup_mem
 
 
-def supervised_masks_estimation(args, index, queue, queue_index, mix_index1, mix_index2, epoch, bsz, device,selected_pairs):
-    ###################### Supervised mask excluding augmented view ###############################
-    #labels = labels.contiguous().view(-1, 1)
+def supervised_masks_estimation(args, index, queue, queue_index, mix_index1, mix_index2, epoch, bsz, device, selected_pairs):
+    # Supervised mask excluding augmented view
+    # labels = labels.contiguous().view(-1, 1)
 
     if index.shape[0] != bsz:
         raise ValueError('Num of labels does not match num of features')
-    
+
     temp_graph = selected_pairs[index][:,index]
+
     ##Create mask without diagonal to avoid augmented view, i.e. this is supervised mask
     maskSup_batch = temp_graph.float().to(device) 
     maskSup_batch [torch.eye(bsz) == 1] = 0

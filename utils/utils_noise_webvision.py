@@ -223,7 +223,7 @@ def train_uns(args, scheduler,model,model_ema,contrast,queue,device, train_loade
     print('train_uns_loss',train_loss_1.avg)
     print('train time', time.time()-end)
     
-def train_sup(args, scheduler,model,model_ema,contrast,queue,device, train_loader, train_selected_loader, optimizer, epoch,noisy_pairs,log_file):
+def train_sup(args, scheduler,model,model_ema,contrast,queue,device, train_loader, train_selected_loader, optimizer, epoch, noisy_pairs, log_file):
     train_loss_1 = AverageMeter()
     train_loss_3 = AverageMeter()      
 
@@ -289,7 +289,7 @@ def train_sup(args, scheduler,model,model_ema,contrast,queue,device, train_loade
                 pairwise_comp_mem = torch.matmul(embeds_mem[:2 * bsz], embeds_mem[2 * bsz:].t()) ##Compare mini-batch with memory
 
             maskSup_batch, maskSup_mem, mask2Sup_batch, mask2Sup_mem = \
-                supervised_masks_estimation(args, index.long(), queue, queue_index.long(), mix_index1, mix_index2, epoch, bsz, device,noisy_pairs)
+                supervised_masks_estimation(args, index.long(), queue, queue_index.long(), mix_index1, mix_index2, epoch, bsz, device, noisy_pairs)
 
 
             logits_mask_batch = (torch.ones_like(maskSup_batch) - torch.eye(2 * bsz).to(device))  ## Negatives mask, i.e. all except self-contrast sample
