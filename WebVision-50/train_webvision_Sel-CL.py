@@ -195,11 +195,11 @@ def data_config(args, transform_train, transform_test):
 
 
 def build_model(args, device):
-    model = mod.ResNet18(
+    model = mod.PreActResNet18(
         num_classes=args.num_classes, low_dim=args.low_dim, head=args.headType
     ).to(device)
     model = nn.DataParallel(model)
-    model_ema = mod.ResNet18(
+    model_ema = mod.PreActResNet18(
         num_classes=args.num_classes, low_dim=args.low_dim, head=args.headType
     ).to(device)
     model_ema = nn.DataParallel(model_ema)
@@ -387,7 +387,7 @@ def main(args):
             torch.save(scheduler.state_dict(), os.path.join(exp_path, 'scheduler_'+str(epoch)+'epoch.pth'))
             torch.save(uns_contrast, os.path.join(exp_path, 'uns_contrast_'+str(epoch)+'epoch.pth'))
             torch.save(queue, os.path.join(exp_path, 'queue_'+str(epoch)+'epoch.pth'))
-        
+
         if(epoch == args.epoch):
             torch.save(model.state_dict(), os.path.join(exp_path, snapLast+'.pth'))
 
