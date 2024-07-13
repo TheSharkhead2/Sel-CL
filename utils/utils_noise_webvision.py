@@ -923,6 +923,7 @@ def pair_selection(args, net, device, trainloader, testloader, epoch):
         else:
             k_corrected = num_samples2select_class
 
+        print("discrepany_class", discrepancy_class)
         top_clean_class_relative_idx = torch.topk(
             discrepancy_class,
             k=int(k_corrected),
@@ -930,8 +931,8 @@ def pair_selection(args, net, device, trainloader, testloader, epoch):
             sorted=False
         )[1]
 
-        print("i", i)
-        print(top_clean_class_relative_idx)
+        # print("i", i)
+        # print(top_clean_class_relative_idx)
 
         agreement_measure[idx_class[top_clean_class_relative_idx]] = 1.0
 
