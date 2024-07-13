@@ -724,6 +724,7 @@ def pair_selection(args, net, device, trainloader, testloader, epoch):
         len(trainloader.dataset),
         len(trainloader.dataset)
     )
+    print("smiliar_graph_all initiali size: ", smiliar_graph_all.shape)
 
     with torch.no_grad():
         for batch_idx, (inputs, _, _) in enumerate(temploader):
@@ -956,6 +957,8 @@ def pair_selection(args, net, device, trainloader, testloader, epoch):
                 total_selected_num
             )
         ].clone()
+
+        print("similar_graph_all", smiliar_graph_all)
         temp_graph = smiliar_graph_all[
             index_selected.unsqueeze(1).expand(
                 total_selected_num,
