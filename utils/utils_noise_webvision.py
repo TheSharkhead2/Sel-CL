@@ -965,6 +965,8 @@ def pair_selection(args, net, device, trainloader, testloader, epoch):
                 total_selected_num
             )
         ]
+        print("selected_pairs", selected_pairs)
+        print("temp_graph", temp_graph)
         selected_th = np.quantile(temp_graph[selected_pairs], args.beta)
         print('selected_th', selected_th)
         temp = torch.zeros(total_num, total_num).type(torch.uint8)

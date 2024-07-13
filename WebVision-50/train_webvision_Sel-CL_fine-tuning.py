@@ -8,7 +8,7 @@ import argparse
 import os
 import time
 
-from dataset.webvision_dataset import *
+from dataset.webvision_dataset import get_dataset
 import torch.utils.data as data
 from torch import optim
 from torchvision import datasets, transforms, models
@@ -27,59 +27,142 @@ import models_webvision as mod
 def parse_args():
     parser = argparse.ArgumentParser(description='command for the first train')
     parser.add_argument('--lr', type=float, default=0.1, help='learning rate')
-    parser.add_argument('--batch_size', type=int, default=64, help='#images in each mini-batch')
-    parser.add_argument('--test_batch_size', type=int, default=100, help='#images in each mini-batch')
-    parser.add_argument('--epoch', type=int, default=50, help='training epoches')
-    parser.add_argument('--num_classes', type=int, default=50, help='Number of in-distribution classes')
-    parser.add_argument('--wd', type=float, default=1e-4, help='weight decay')
-    parser.add_argument('--momentum', default=0.9, type=float, help='momentum')
-    parser.add_argument('--trainval_root', default='./dataset/webvision-50/', help='root for train data')
-    parser.add_argument('--val_root', default='./dataset/imagenet/', help='root for imagenet val data')
-    parser.add_argument('--out', type=str, default='./out/', help='Directory of the output')
-    parser.add_argument('--alpha_m', type=float, default=1.0, help='Beta distribution parameter for mixup')
-    parser.add_argument('--network', type=str, default='RN18', help='Network architecture')
-    parser.add_argument('--seed_initialization', type=int, default=1, help='random seed (default: 1)')
-    parser.add_argument('--seed_dataset', type=int, default=42, help='random seed (default: 1)')
-    parser.add_argument('--M', action='append', type=int, default=[], help="Milestones for the LR sheduler")
-    parser.add_argument('--experiment_name', type=str, default = 'Proof',help='name of the experiment (for the output files)')
-    parser.add_argument('--dataset', type=str, default='webvision', help='CIFAR-10, CIFAR-100')
-    parser.add_argument('--initial_epoch', type=int, default=1, help="Star training at initial_epoch")
-    parser.add_argument('--low_dim', type=int, default=128, help='Size of contrastive learning embedding')
-    parser.add_argument('--headType', type=str, default="Linear", help='Linear, NonLinear')
-    parser.add_argument('--startLabelCorrection', type=int, default=9999, help='Epoch to start label correction')
-    parser.add_argument('--ReInitializeClassif', type=int, default=1, help='Enable predictive label correction')
+    parser.add_argument(
+        '--batch_size', type=int, default=64, help='#images in each mini-batch'
+    )
+    parser.add_argument(
+        '--test_batch_size', type=int, default=100,
+        help='#images in each mini-batch'
+    )
+    parser.add_argument(
+        '--epoch', type=int, default=50, help='training epoches')
+    parser.add_argument(
+        '--num_classes', type=int, default=50,
+        help='Number of in-distribution classes'
+    )
+    parser.add_argument(
+        '--wd', type=float, default=1e-4, help='weight decay')
+    parser.add_argument(
+        '--momentum', default=0.9, type=float, help='momentum')
+    parser.add_argument(
+        '--trainval_root', default='./dataset/webvision-50/',
+        help='root for train data'
+    )
+    parser.add_argument(
+        '--val_root', default='./dataset/imagenet/',
+        help='root for imagenet val data'
+    )
+    parser.add_argument(
+        '--out', type=str, default='./out/', help='Directory of the output')
+    parser.add_argument(
+        '--alpha_m', type=float, default=1.0,
+        help='Beta distribution parameter for mixup'
+    )
+    parser.add_argument(
+        '--network', type=str, default='RN18', help='Network architecture')
+    parser.add_argument(
+        '--seed_initialization', type=int, default=1,
+        help='random seed (default: 1)'
+    )
+    parser.add_argument(
+        '--seed_dataset', type=int, default=42, help='random seed (default: 1)'
+    )
+    parser.add_argument(
+        '--M', action='append', type=int, default=[],
+        help="Milestones for the LR sheduler"
+    )
+    parser.add_argument(
+        '--experiment_name', type=str, default='Proof',
+        help='name of the experiment (for the output files)'
+    )
+    parser.add_argument(
+        '--dataset', type=str, default='webvision', help='CIFAR-10, CIFAR-100')
+    parser.add_argument(
+        '--initial_epoch', type=int, default=1,
+        help="Star training at initial_epoch"
+    )
+    parser.add_argument(
+        '--low_dim', type=int, default=128,
+        help='Size of contrastive learning embedding'
+    )
+    parser.add_argument(
+        '--headType', type=str, default="Linear", help='Linear, NonLinear')
+    parser.add_argument(
+        '--startLabelCorrection', type=int, default=9999,
+        help='Epoch to start label correction'
+    )
+    parser.add_argument(
+        '--ReInitializeClassif', type=int, default=1,
+        help='Enable predictive label correction'
+    )
     args = parser.parse_args()
     return args
 
-def data_config(args, transform_train, transform_test,clean_idx):
 
-    trainset, testset, imagenet_set = get_dataset(args, TwoTransform(transform_train,transform_test), transform_test)
-    
-    trainset.train_imgs = trainset.train_imgs[clean_idx==1]
-    trainset.train_labels = trainset.train_labels[clean_idx==1]    
-    
-    train_loader = torch.utils.data.DataLoader(trainset, batch_size=args.batch_size, shuffle=True, num_workers=8, pin_memory=True)
-    test_loader = torch.utils.data.DataLoader(testset, batch_size=args.test_batch_size, shuffle=False, num_workers=8, pin_memory=True)
-    imagenet_test_loader = torch.utils.data.DataLoader(imagenet_set, batch_size=args.test_batch_size, shuffle=False, num_workers=8, pin_memory=True)
+def data_config(args, transform_train, transform_test, clean_idx):
+
+    trainset, testset, imagenet_set = get_dataset(
+        args,
+        TwoTransform(transform_train, transform_test),
+        transform_test
+    )
+
+    trainset.train_imgs = trainset.train_imgs[clean_idx == 1]
+    trainset.train_labels = trainset.train_labels[clean_idx == 1]
+
+    train_loader = torch.utils.data.DataLoader(
+        trainset,
+        batch_size=args.batch_size,
+        shuffle=True,
+        num_workers=8,
+        pin_memory=True
+    )
+    test_loader = torch.utils.data.DataLoader(
+        testset,
+        batch_size=args.test_batch_size,
+        shuffle=False,
+        num_workers=8,
+        pin_memory=True
+    )
+    imagenet_test_loader = torch.utils.data.DataLoader(
+        imagenet_set,
+        batch_size=args.test_batch_size,
+        shuffle=False,
+        num_workers=8,
+        pin_memory=True
+    )
     print('############# Data loaded #############')
 
     return train_loader, test_loader, imagenet_test_loader, trainset
 
+
 def main(args):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    exp_path = os.path.join(args.out, 'noise_models_' + args.network + '_{0}_SI{1}_SD{2}'.format(args.experiment_name,
-                                                                                             args.seed_initialization,
-                                                                                             args.seed_dataset))
-    res_path = os.path.join(args.out, 'metrics' + args.network + '_{0}_SI{1}_SD{2}'.format(args.experiment_name,
-                                                                                       args.seed_initialization,
-                                                                                       args.seed_dataset))
+    exp_path = os.path.join(
+        args.out,
+        'noise_models_' + args.network + '_{0}_SI{1}_SD{2}'.format(
+            args.experiment_name,
+            args.seed_initialization,
+            args.seed_dataset
+        )
+    )
+    res_path = os.path.join(
+        args.out,
+        'metrics' + args.network + '_{0}_SI{1}_SD{2}'.format(
+            args.experiment_name,
+            args.seed_initialization,
+            args.seed_dataset
+        )
+    )
 
-    torch.backends.cudnn.deterministic = True  # fix the GPU to deterministic mode
+    # fix the GPU to deterministic mode
+    torch.backends.cudnn.deterministic = True
     torch.manual_seed(args.seed_initialization)  # CPU seed
     if device == "cuda":
         torch.cuda.manual_seed_all(args.seed_initialization)  # GPU seed
 
-    random.seed(args.seed_initialization)  # python seed for image transformation
+    # python seed for image transformation
+    random.seed(args.seed_initialization)
 
     mean = [0.485, 0.456, 0.406]
     std = [0.229, 0.224, 0.225]
