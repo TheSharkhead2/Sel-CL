@@ -959,6 +959,7 @@ def pair_selection(args, net, device, trainloader, testloader, epoch):
         ].clone()
 
         print("similar_graph_all", smiliar_graph_all)
+        print("index_selected", index_selected)
         temp_graph = smiliar_graph_all[
             index_selected.unsqueeze(1).expand(
                 total_selected_num,
