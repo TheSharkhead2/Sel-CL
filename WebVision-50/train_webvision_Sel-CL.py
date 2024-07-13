@@ -15,6 +15,8 @@ from torchvision import datasets, transforms, models
 import random
 import sys
 
+from webvision_model import build_model
+
 sys.path.append('../utils')
 from utils_noise_webvision import train_sel, train_uns, train_sup, pair_selection
 from test_eval import test_eval
@@ -189,40 +191,9 @@ def data_config(args, transform_train, transform_test):
     return train_loader, test_loader, imagenet_test_loader, trainset
 
 
-def build_model(args, device):
-    if args.network == "RN18":
-        model = mod.ResNet18(
-            num_classes=args.num_classes,
-            low_dim=args.low_dim,
-            head=args.headType
-        ).to(device)
-        model_ema = mod.ResNet18(
-            num_classes=args.num_classes,
-            low_dim=args.low_dim,
-            head=args.headType
-        ).to(device)
-    elif args.network == "PARN18":
-        model = mod.PreActResNet18(
-            num_classes=args.num_classes,
-            low_dim=args.low_dim,
-            head=args.headType
-        ).to(device)
-        model_ema = mod.PreActResNet18(
-            num_classes=args.num_classes,
-            low_dim=args.low_dim,
-            head=args.headType
-        ).to(device)
-    elif args.network == "PARN50":
-        model = mod.PreActResNet50(
-            num_classes=args.num_classes,
-            low_dim=args.low_dim,
-            head=args.headType
-        ).to(device)
-        model_ema = mod.PreActResNet50(
-            num_classes=args.num_classes,
-            low_dim=args.low_dim,
-            head=args.headType
-        ).to(device)
+def build_models(args, device):
+    model = build_model(args, device)
+    model_ema = build_model(args, device)
 
     model = nn.DataParallel(model)
     model_ema = nn.DataParallel(model_ema)
@@ -327,7 +298,7 @@ def main(args):
     train_loader, test_loader, imagenet_test_loader, trainset = data_config(
         args, transform_train, transform_test)
 
-    model, model_ema = build_model(args, device)
+    model, model_ema = build_models(args, device)
 
     uns_contrast = MemoryMoCo(
         args.low_dim, args.uns_queue_k, args.uns_t, thresh=0).cuda()

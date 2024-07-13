@@ -16,16 +16,24 @@ from torchvision import datasets, transforms, models
 import random
 import sys
 
+from webvision_model import build_model
+
 sys.path.append('../utils')
 from utils_noise_webvision import *
-from utils_plus_webvision import *
+from utils_plus_webvision import train_mixup
 from test_eval import test_eval
 from other_utils import *
 import models_webvision as mod
 
+import wandb
+
 
 def parse_args():
     parser = argparse.ArgumentParser(description='command for the first train')
+
+    parser.add_argument("--wandb-project", default="NaN", type=str)
+    parser.add_argument("--root", type=str)
+
     parser.add_argument('--lr', type=float, default=0.1, help='learning rate')
     parser.add_argument(
         '--batch_size', type=int, default=64, help='#images in each mini-batch'
@@ -164,8 +172,14 @@ def main(args):
     # python seed for image transformation
     random.seed(args.seed_initialization)
 
-    mean = [0.485, 0.456, 0.406]
-    std = [0.229, 0.224, 0.225]
+    if args.dataset == "inat100k":
+        # 123.3945866481466, 126.3885961963497, 107.48126061777886
+        mean = [0.4839, 0.4956, 0.4215]
+        # 55.34541875861789, 54.35099612029171, 62.73211140831446
+        std = [0.2170, 0.2131, 0.2460]
+    else:
+        mean = [0.485, 0.456, 0.406]
+        std = [0.229, 0.224, 0.225]
 
     transform_train = transforms.Compose([
         transforms.Resize(256),
@@ -173,43 +187,50 @@ def main(args):
         transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
         transforms.Normalize(mean, std),
-        ])
-        
+    ])
+
     transform_test = transforms.Compose([
-                transforms.Resize(256),
-                transforms.CenterCrop(224),
-                transforms.ToTensor(),
-                transforms.Normalize(mean, std),
-            ])  
+        transforms.Resize(256),
+        transforms.CenterCrop(224),
+        transforms.ToTensor(),
+        transforms.Normalize(mean, std),
+    ])
 
-
-    clean_idx = np.load(res_path+ "/selected_examples_train.npy")
-    train_loader, test_loader, imagenet_test_loader, trainset= data_config(args, transform_train, transform_test, clean_idx)
+    clean_idx = np.load(res_path + "/selected_examples_train.npy")
+    train_loader, test_loader, imagenet_test_loader, trainset = data_config(
+        args, transform_train, transform_test, clean_idx
+    )
     st = time.time()
 
-    
-    model = mod.ResNet18(num_classes=args.num_classes, low_dim=args.low_dim, head=args.headType).to(device)
+    # model = mod.ResNet18(
+    #     num_classes=args.num_classes,
+    #     low_dim=args.low_dim,
+    #     head=args.headType
+    # ).to(device)
+    model = build_model(args, device)
 
     try:
-        load_model = torch.load(exp_path+ "/Sel-CL_model.pth")
+        load_model = torch.load(exp_path + "/Sel-CL_model.pth")
     except:
-        load_model = torch.load(exp_path+ "/Sel-CL_model_130epoch.pth")
-        
+        load_model = torch.load(exp_path + "/Sel-CL_model_130epoch.pth")
+
     try:
-        state_dic={k.replace('module.',''):v for k,v in load_model['model'].items()}
+        state_dic = {
+            k.replace('module.', ''): v for k, v in load_model['model'].items()
+        }
     except:
-        state_dic={k.replace('module.',''):v for k,v in load_model.items()}
+        state_dic = {
+            k.replace('module.', ''): v for k, v in load_model.items()
+        }
     model.load_state_dict(state_dic)
-        
 
-    if args.ReInitializeClassif==1:
+    if args.ReInitializeClassif == 1:
         model.linear2 = nn.Linear(512, args.num_classes).to(device)
-        
+
     model = nn.DataParallel(model)
 
-    res_path = res_path +"/plus/"
-    exp_path = exp_path +"/plus/"
-    
+    res_path = res_path + "/plus/"
+    exp_path = exp_path + "/plus/"
 
     if not os.path.isdir(res_path):
         os.makedirs(res_path)
@@ -217,20 +238,25 @@ def main(args):
     if not os.path.isdir(exp_path):
         os.makedirs(exp_path)
 
-
-    __console__=sys.stdout
-    name= "/results"
-    log_file=open(res_path+name+".log",'a')
-    sys.stdout=log_file
+    __console__ = sys.stdout
+    name = "/results"
+    log_file = open(res_path+name+".log", 'a')
+    sys.stdout = log_file
     print(args)
 
     milestones = args.M
 
-    optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.wd)
-    scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=milestones, gamma=0.1)
+    optimizer = optim.SGD(
+        model.parameters(),
+        lr=args.lr,
+        momentum=args.momentum,
+        weight_decay=args.wd
+    )
+    scheduler = optim.lr_scheduler.MultiStepLR(
+        optimizer, milestones=milestones, gamma=0.1)
 
-    best_acc_val_1 =0
-    best_acc_val_2 =0
+    best_acc_val_1 = 0
+    best_acc_val_2 = 0
     for epoch in range(args.initial_epoch, args.epoch + 1):
         st = time.time()
         print("=================>    ", args.experiment_name)
@@ -238,25 +264,76 @@ def main(args):
         scheduler.step()
         train_mixup(args, model, device, train_loader, optimizer, epoch)
 
-        _, acc_val_1 = test_eval(args, model, device, test_loader)
-        _, acc_val_2 = test_eval(args, model, device, imagenet_test_loader)
-
+        _, _, val_top1, val_top5 = test_eval(
+            args, model, device, test_loader)
+        _, _, test_top1, test_top5 = test_eval(
+            args, model, device, imagenet_test_loader)
 
         print('Epoch time: {:.2f} seconds\n'.format(time.time()-st))
 
         if epoch == args.initial_epoch:
-            best_acc_val_1 = acc_val_1
-            best_acc_val_2 = acc_val_2
+            best_acc_val_1 = val_top1
+            best_acc_val_2 = test_top1
         else:
-            if acc_val_1 > best_acc_val_1:
-                torch.save(model.state_dict(), os.path.join(exp_path, 'best_val_sel-cl_model.pth'))
-                best_acc_val_1 = acc_val_1
-            if acc_val_2 > best_acc_val_2:
-                best_acc_val_2 = acc_val_2
+            if val_top1 > best_acc_val_1:
+                torch.save(
+                    model.state_dict(),
+                    os.path.join(exp_path, 'best_val_sel-cl_model.pth')
+                )
+                best_acc_val_1 = val_top1
+            if test_top1 > best_acc_val_2:
+                best_acc_val_2 = test_top1
+
+        wandb.log({
+            "val_top1_acc": val_top1,
+            "val_top5_acc": val_top5,
+            "test_top1_acc": test_top1,
+            "test_top5_acc": test_top5
+        })
 
     print('Best acc:', best_acc_val_1, best_acc_val_2)
 
 
 if __name__ == "__main__":
     args = parse_args()
+
+    wandb.init(
+        project=args.wandb_project,
+        config={
+            "epochs": args.epoch,
+            "warmup_epochs": args.warmup_epoch,
+            "warmup_way": args.warmup_way,
+            "base_lr": args.lr,
+            "lr_scheduler": args.lr_scheduler,
+            "lr_warmup_epoch": args.lr_warmup_epoch,
+            "lr_warmup_multiplier": args.lr_warmup_multiplier,
+            "lr_decay_epochs": args.lr_decay_epochs,
+            "lr_decay_rate": args.lr_decay_rate,
+            "initial_epoch": args.initial_epoch,
+            "batch_size": args.batch_size,
+            "test_batch_size": args.test_batch_size,
+            "weight_decay": args.wd,
+            "momentum": args.momentum,
+            "dataset": args.dataset,
+            "experiment_name": args.experiment_name,
+            "low_dim": args.low_dim,
+            "seed_initialization": args.seed_initialization,
+            "seed_dataset": args.seed_dataset,
+            "alpha_m": args.alpha_m,
+            "alpha_moving": args.alpha_moving,
+            "alpha": args.alpha,
+            "beta": args.beta,
+            "uns_queue_k": args.uns_queue_k,
+            "uns_t": args.uns_t,
+            "sup_t": args.sup_t,
+            "sup_queue_use": args.sup_queue_use,
+            "sup_queue_begin": args.sup_queue_begin,
+            "queue_per_class": args.queue_per_class,
+            "aprox": args.aprox,
+            "lambda_s": args.lambda_s,
+            "lambda_c": args.lambda_c,
+            "k_val": args.k_val
+        }
+    )
+
     main(args)
