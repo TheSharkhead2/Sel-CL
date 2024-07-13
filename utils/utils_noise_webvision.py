@@ -909,6 +909,8 @@ def pair_selection(args, net, device, trainloader, testloader, epoch):
     agreement_measure = torch.zeros(
         (len(temploader.dataset.targets),)).to(device)
 
+    print("agreement_measure shape", agreement_measure.shape)
+
     for i in range(args.num_classes):
         idx_class = temploader.dataset.targets == i
         samplesPerClass = idx_class.sum()
@@ -927,6 +929,9 @@ def pair_selection(args, net, device, trainloader, testloader, epoch):
             largest=False,
             sorted=False
         )[1]
+
+        print("i", i)
+        print(top_clean_class_relative_idx)
 
         agreement_measure[idx_class[top_clean_class_relative_idx]] = 1.0
 
