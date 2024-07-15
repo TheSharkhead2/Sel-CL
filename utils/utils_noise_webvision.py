@@ -913,7 +913,9 @@ def pair_selection(args, net, device, trainloader, testloader, epoch):
 
     for i in range(args.num_classes):
         idx_class = temploader.dataset.targets == i
+        print("idx_class 1", idx_class)
         samplesPerClass = idx_class.sum()
+        print("samplesPerClass", samplesPerClass)
         idx_class = torch.from_numpy(idx_class.astype("float"))
         idx_class = (idx_class == 1.0).nonzero().squeeze().to(device)
         discrepancy_class = discrepancy_measure2[idx_class]
@@ -924,7 +926,7 @@ def pair_selection(args, net, device, trainloader, testloader, epoch):
             k_corrected = num_samples2select_class
 
         print("discrepany_class", discrepancy_class)
-        print(k_corrected)
+        print("k_corrected", k_corrected)
         top_clean_class_relative_idx = torch.topk(
             discrepancy_class,
             k=int(k_corrected),
