@@ -916,6 +916,8 @@ def pair_selection(args, net, device, trainloader, testloader, epoch):
         print("idx_class 1", idx_class)
         samplesPerClass = idx_class.sum()
         print("samplesPerClass", samplesPerClass)
+        print("num_samples2select_class", num_samples2select_class)
+
         idx_class = torch.from_numpy(idx_class.astype("float"))
         idx_class = (idx_class == 1.0).nonzero().squeeze().to(device)
         discrepancy_class = discrepancy_measure2[idx_class]
