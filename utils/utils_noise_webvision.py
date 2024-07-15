@@ -924,6 +924,7 @@ def pair_selection(args, net, device, trainloader, testloader, epoch):
             k_corrected = num_samples2select_class
 
         print("discrepany_class", discrepancy_class)
+        print(k_corrected)
         top_clean_class_relative_idx = torch.topk(
             discrepancy_class,
             k=int(k_corrected),
