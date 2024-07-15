@@ -43,7 +43,8 @@ def train_sel(
     optimizer,
     epoch,
     selected_pairs,
-    log_file
+    log_file,
+    flops_profiler
 ):
     train_loss_1 = AverageMeter()
     train_loss_2 = AverageMeter()
@@ -60,6 +61,9 @@ def train_sel(
     criterion = NCESoftmaxLoss(reduction="none").cuda()
     train_selected_loader_iter = iter(train_selected_loader)
     for batch_idx, (img, labels, index) in enumerate(train_loader):
+
+        if args.flops_profiling:
+            flops_profiler.start_profile()
 
         img1, img2, labels, index = (
             img[0].to(device),
@@ -309,6 +313,9 @@ def train_sel(
                 args.lambda_s * loss_simi
             )
 
+        if args.flops_profiling:
+            flops_profiler.stop_profile()
+
         scaler.scale(loss).backward()
         scaler.unscale_(optimizer)
         nn.utils.clip_grad_norm_(model.parameters(), max_norm=1, norm_type=2)
@@ -358,7 +365,8 @@ def train_uns(
     train_loader,
     optimizer,
     epoch,
-    log_file
+    log_file,
+    flops_profiler
 ):
     train_loss_1 = AverageMeter()
     model.train()
@@ -369,6 +377,9 @@ def train_uns(
     scaler = amp.GradScaler()
     criterion = NCESoftmaxLoss(reduction="mean").cuda()
     for batch_idx, (img, labels, index) in enumerate(train_loader):
+
+        if args.flops_profiling:
+            flops_profiler.start_profile()
 
         img1, img2, labels, index = (
             img[0].to(device),
@@ -418,6 +429,11 @@ def train_uns(
                     )
                 )
 
+        if args.flops_profiling:
+            flops_profiler.stop_profile()
+            flops_profiler.print_model_profile()
+
+
         scaler.scale(uns_loss).backward()
         scaler.step(optimizer)
         scaler.update()
@@ -457,7 +473,8 @@ def train_sup(
     optimizer,
     epoch,
     noisy_pairs,
-    log_file
+    log_file,
+    flops_profiler
 ):
     train_loss_1 = AverageMeter()
     train_loss_3 = AverageMeter()
@@ -472,6 +489,9 @@ def train_sup(
     criterionCE = torch.nn.CrossEntropyLoss(reduction="none").cuda()
     train_selected_loader_iter = iter(train_selected_loader)
     for batch_idx, (img, labels, index) in enumerate(train_loader):
+
+        if args.flops_profiling:
+            flops_profiler.start_profile()
 
         img1, img2, labels, index = (
             img[0].to(device),
@@ -669,6 +689,10 @@ def train_sup(
             )
 
             loss = loss_sup.mean() + args.lambda_c*lossClassif
+
+        if args.flops_profiling:
+            flops_profiler.stop_profile()
+            flops_profiler.print_model_profile()
 
         scaler.scale(loss).backward()
         scaler.step(optimizer)

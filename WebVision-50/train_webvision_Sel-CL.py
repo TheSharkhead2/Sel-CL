@@ -29,12 +29,16 @@ from lr_scheduler import get_scheduler
 
 import wandb
 
+from deepspeed.profiling.flops_profiler import FlopsProfiler
+
 
 def parse_args():
     parser = argparse.ArgumentParser(description='command for the first train')
 
     parser.add_argument("--wandb-project", default="NaN", type=str)
     parser.add_argument("--root", type=str)
+    parser.add_argument(
+        "--flops_profiling", type=bool, default=False, action="store_true")
 
     parser.add_argument(
         '--epoch', type=int, default=130, help='training epoches')
@@ -316,9 +320,12 @@ def main(args):
     else:
         queue = []
 
+    flops_profiler = FlopsProfiler(model)
+
     for epoch in range(args.initial_epoch, args.epoch + 1):
         st = time.time()
         print("=================>    ", args.experiment_name)
+
         if (epoch <= args.warmup_epoch):
             if (args.warmup_way == 'uns'):
                 train_uns(
@@ -332,7 +339,8 @@ def main(args):
                     train_loader,
                     optimizer,
                     epoch,
-                    log_file
+                    log_file,
+                    flops_profiler
                 )
             else:
                 train_selected_loader = torch.utils.data.DataLoader(
@@ -360,7 +368,8 @@ def main(args):
                     optimizer,
                     epoch,
                     torch.eq(trainNoisyLabels, trainNoisyLabels.t()),
-                    log_file
+                    log_file,
+                    flops_profiler
                 )
         else:
             train_selected_loader = torch.utils.data.DataLoader(
@@ -385,7 +394,8 @@ def main(args):
                 optimizer,
                 epoch,
                 selected_pairs,
-                log_file
+                log_file,
+                flops_profiler
             )
 
         if (epoch % 10 == 0) or (epoch == args.epoch):
