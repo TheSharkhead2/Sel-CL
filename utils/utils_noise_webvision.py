@@ -927,24 +927,24 @@ def pair_selection(args, net, device, trainloader, testloader, epoch):
     elif (args.alpha == 0.0):
         num_samples2select_class = torch.min(num_clean_per_class)
     else:
-        print("confirm alpha", args.alpha)
+        # print("confirm alpha", args.alpha)
         num_samples2select_class = torch.quantile(
             num_clean_per_class, args.alpha)
 
-    print("num_samples2select_class initial", num_samples2select_class)
-    print("num_clean_per_class", num_clean_per_class)
+    # print("num_samples2select_class initial", num_samples2select_class)
+    # print("num_clean_per_class", num_clean_per_class)
 
     agreement_measure = torch.zeros(
         (len(temploader.dataset.targets),)).to(device)
 
-    print("agreement_measure shape", agreement_measure.shape)
+    # print("agreement_measure shape", agreement_measure.shape)
 
     for i in range(args.num_classes):
         idx_class = temploader.dataset.targets == i
-        print("idx_class 1", idx_class)
+        # print("idx_class 1", idx_class)
         samplesPerClass = idx_class.sum()
-        print("samplesPerClass", samplesPerClass)
-        print("num_samples2select_class", num_samples2select_class)
+        # print("samplesPerClass", samplesPerClass)
+        # print("num_samples2select_class", num_samples2select_class)
 
         idx_class = torch.from_numpy(idx_class.astype("float"))
         idx_class = (idx_class == 1.0).nonzero().squeeze().to(device)
@@ -959,8 +959,8 @@ def pair_selection(args, net, device, trainloader, testloader, epoch):
         if k_corrected == 0:
             k_corrected = 1
 
-        print("discrepany_class", discrepancy_class)
-        print("k_corrected", k_corrected)
+        # print("discrepany_class", discrepancy_class)
+        # print("k_corrected", k_corrected)
         top_clean_class_relative_idx = torch.topk(
             discrepancy_class,
             k=int(k_corrected),
@@ -974,7 +974,7 @@ def pair_selection(args, net, device, trainloader, testloader, epoch):
         agreement_measure[idx_class[top_clean_class_relative_idx]] = 1.0
 
     selected_examples = agreement_measure
-    print('selected examples', sum(selected_examples))
+    # print('selected examples', sum(selected_examples))
     trainloader.dataset.transform = transform_bak
     # select pairs
     with torch.no_grad():
@@ -1001,8 +1001,8 @@ def pair_selection(args, net, device, trainloader, testloader, epoch):
             )
         ].clone()
 
-        print("similar_graph_all", smiliar_graph_all)
-        print("index_selected", index_selected)
+        # print("similar_graph_all", smiliar_graph_all)
+        # print("index_selected", index_selected)
         temp_graph = smiliar_graph_all[
             index_selected.unsqueeze(1).expand(
                 total_selected_num,
@@ -1012,10 +1012,10 @@ def pair_selection(args, net, device, trainloader, testloader, epoch):
                 total_selected_num
             )
         ]
-        print("selected_pairs", selected_pairs)
-        print("temp_graph", temp_graph)
+        # print("selected_pairs", selected_pairs)
+        # print("temp_graph", temp_graph)
         selected_th = np.quantile(temp_graph[selected_pairs], args.beta)
-        print('selected_th', selected_th)
+        # print('selected_th', selected_th)
         temp = torch.zeros(total_num, total_num).type(torch.uint8)
         noisy_pairs = torch.where(
             smiliar_graph_all < selected_th,
