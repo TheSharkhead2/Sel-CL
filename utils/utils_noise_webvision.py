@@ -315,6 +315,7 @@ def train_sel(
 
         if args.flops_profiling and args.flops_profiler_index == batch_idx:
             flops_profiler.stop_profile()
+            flops_profiler.print_model_profile(profile_step=args.flops_profiler_index)
 
         scaler.scale(loss).backward()
         scaler.unscale_(optimizer)
@@ -431,7 +432,7 @@ def train_uns(
 
         if args.flops_profiling and args.flops_profiler_index == batch_idx:
             flops_profiler.stop_profile()
-            flops_profiler.print_model_profile()
+            flops_profiler.print_model_profile(profile_step=args.flops_profiler_index)
 
 
         scaler.scale(uns_loss).backward()
@@ -692,7 +693,7 @@ def train_sup(
 
         if args.flops_profiling and args.flops_profiler_index == batch_idx:
             flops_profiler.stop_profile()
-            flops_profiler.print_model_profile()
+            flops_profiler.print_model_profile(profile_step=args.flops_profiler_index)
 
         scaler.scale(loss).backward()
         scaler.step(optimizer)
