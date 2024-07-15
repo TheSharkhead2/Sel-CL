@@ -922,10 +922,10 @@ def pair_selection(args, net, device, trainloader, testloader, epoch):
         idx_class = (idx_class == 1.0).nonzero().squeeze().to(device)
         discrepancy_class = discrepancy_measure2[idx_class]
 
-        if num_samples2select_class >= samplesPerClass:
+        if num_samples2select_class.item() >= samplesPerClass:
             k_corrected = samplesPerClass
         else:
-            k_corrected = num_samples2select_class
+            k_corrected = num_samples2select_class.item()
 
         print("discrepany_class", discrepancy_class)
         print("k_corrected", k_corrected)
