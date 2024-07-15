@@ -38,6 +38,7 @@ def parse_args():
     parser.add_argument("--wandb-project", default="NaN", type=str)
     parser.add_argument("--root", type=str)
     parser.add_argument("--flops_profiling", action="store_true")
+    parser.add_argument("--flops_profiler_index", type=int, default=5)
 
     parser.add_argument(
         '--epoch', type=int, default=130, help='training epoches')

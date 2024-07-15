@@ -62,7 +62,7 @@ def train_sel(
     train_selected_loader_iter = iter(train_selected_loader)
     for batch_idx, (img, labels, index) in enumerate(train_loader):
 
-        if args.flops_profiling:
+        if args.flops_profiling and args.flops_profiler_index == batch_idx:
             flops_profiler.start_profile()
 
         img1, img2, labels, index = (
@@ -313,7 +313,7 @@ def train_sel(
                 args.lambda_s * loss_simi
             )
 
-        if args.flops_profiling:
+        if args.flops_profiling and args.flops_profiler_index == batch_idx:
             flops_profiler.stop_profile()
 
         scaler.scale(loss).backward()
@@ -378,7 +378,7 @@ def train_uns(
     criterion = NCESoftmaxLoss(reduction="mean").cuda()
     for batch_idx, (img, labels, index) in enumerate(train_loader):
 
-        if args.flops_profiling:
+        if args.flops_profiling and args.flops_profiler_index == batch_idx:
             flops_profiler.start_profile()
 
         img1, img2, labels, index = (
@@ -429,7 +429,7 @@ def train_uns(
                     )
                 )
 
-        if args.flops_profiling:
+        if args.flops_profiling and args.flops_profiler_index == batch_idx:
             flops_profiler.stop_profile()
             flops_profiler.print_model_profile()
 
@@ -490,7 +490,7 @@ def train_sup(
     train_selected_loader_iter = iter(train_selected_loader)
     for batch_idx, (img, labels, index) in enumerate(train_loader):
 
-        if args.flops_profiling:
+        if args.flops_profiling and args.flops_profiler_index == batch_idx:
             flops_profiler.start_profile()
 
         img1, img2, labels, index = (
@@ -690,7 +690,7 @@ def train_sup(
 
             loss = loss_sup.mean() + args.lambda_c*lossClassif
 
-        if args.flops_profiling:
+        if args.flops_profiling and args.flops_profiler_index == batch_idx:
             flops_profiler.stop_profile()
             flops_profiler.print_model_profile()
 
