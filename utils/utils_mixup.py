@@ -93,8 +93,6 @@ def supervised_masks_estimation(
 ):
     # Supervised mask excluding augmented view
     # labels = labels.contiguous().view(-1, 1)
-    index = index.to(device)
-
     if index.shape[0] != bsz:
         raise ValueError('Num of labels does not match num of features')
 

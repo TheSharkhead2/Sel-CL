@@ -434,6 +434,11 @@ def main(args):
                 epoch
             )
 
+            selected_examples, selected_pairs = (
+                selected_examples.to(device),
+                selected_pairs.to(device)
+            )
+
         _, _, val_top1, val_top5 = test_eval(
             args, model, device, test_loader)
         _, _, test_top1, test_top5 = test_eval(
