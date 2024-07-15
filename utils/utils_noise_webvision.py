@@ -931,6 +931,10 @@ def pair_selection(args, net, device, trainloader, testloader, epoch):
         else:
             k_corrected = num_samples2select_class.item()
 
+        # band-aid fix because I don't think this is actually bunk
+        if k_corrected == 0:
+            k_corrected = 1
+
         print("discrepany_class", discrepancy_class)
         print("k_corrected", k_corrected)
         top_clean_class_relative_idx = torch.topk(
