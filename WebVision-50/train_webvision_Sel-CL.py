@@ -199,9 +199,43 @@ def data_config(args, transform_train, transform_test):
     return train_loader, test_loader, imagenet_test_loader, trainset
 
 
-def build_models(args, device):
+def build_models(args, device, exp_path):
     model = build_model(args, device)
     model_ema = build_model(args, device)
+
+    if args.load_from_config:
+        # load models
+        load_model = torch.load(
+            os.path.join(
+                exp_path,
+                "Sel-CL_model_" + str(args.initial_epoch) + "epoch.pth"
+            )
+        )
+        load_model_ema = torch.load(
+            os.path.join(
+                exp_path,
+                "Sel-CL_model_ema_" + str(args.initial_epoch) + "epoch.pth"
+            )
+        )
+        try:
+            state_dic = {
+                k.replace('module.', ''): v for k, v in load_model['model'].items()
+            }
+        except:
+            state_dic = {
+                k.replace('module.', ''): v for k, v in load_model.items()
+            }
+        try:
+            state_dic_ema = {
+                k.replace('module.', ''): v for k, v in load_model_ema['model'].items()
+            }
+        except:
+            state_dic_ema = {
+                k.replace('module.', ''): v for k, v in load_model_ema.items()
+            }
+
+        model.load_state_dict(state_dic)
+        model_ema.load_state_dict(state_dic_ema)
 
     model = nn.DataParallel(model)
     model_ema = nn.DataParallel(model_ema)
@@ -310,42 +344,7 @@ def main(args):
     train_loader, test_loader, imagenet_test_loader, trainset = data_config(
         args, transform_train, transform_test)
 
-    model, model_ema = build_models(args, device)
-
-    if args.load_from_config:
-        # load models
-        load_model = torch.load(
-            os.path.join(
-                exp_path,
-                "Sel-CL_model_" + str(args.initial_epoch) + "epoch.pth"
-            )
-        )
-        load_model_ema = torch.load(
-            os.path.join(
-                exp_path,
-                "Sel-CL_model_ema_" + str(args.initial_epoch) + "epoch.pth"
-            )
-        )
-        try:
-            state_dic = {
-                k.replace('module.', ''): v for k, v in load_model['model'].items()
-            }
-        except:
-            state_dic = {
-                k.replace('module.', ''): v for k, v in load_model.items()
-            }
-        try:
-            state_dic_ema = {
-                k.replace('module.', ''): v for k, v in load_model_ema['model'].items()
-            }
-        except:
-            state_dic_ema = {
-                k.replace('module.', ''): v for k, v in load_model_ema.items()
-            }
-
-        model.load_state_dict(state_dic)
-        model_ema.load_state_dict(state_dic_ema)
-
+    model, model_ema = build_models(args, device, exp_path)
 
     uns_contrast = MemoryMoCo(
         args.low_dim, args.uns_queue_k, args.uns_t, thresh=0).cuda()
