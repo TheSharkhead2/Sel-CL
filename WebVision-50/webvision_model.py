@@ -28,6 +28,6 @@ def build_model(args, device):
             num_classes=args.num_classes,
             low_dim=args.low_dim,
             head=args.headType
-        )
+        ).to(device)
 
     return model
