@@ -4,4 +4,4 @@ CUDA_VISIBLE_DEVICES=0,1,2,3 python3 train_webvision_Sel-CL.py --epoch 130 --num
 --alpha 0.5 --k_val 250 --out /home/trode/selcl/out/ \
 --experiment_name inat100k_selcl --alpha_m 1.0 --seed_initialization 1 --seed_dataset 42 \
 --uns_t 0.1 --uns_queue_k 10000 --lr-warmup-epoch 5 --warmup-epoch 40 --lambda_s 0.01 --lambda_c 1 \
---test_batch_size 100 --beta 0.2 --warmup_way 'sup' --wandb-project "inaturalist"
+--test_batch_size 64 --beta 0.2 --warmup_way 'sup' --wandb-project "inaturalist"

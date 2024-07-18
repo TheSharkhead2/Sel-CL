@@ -40,6 +40,10 @@ def parse_args():
     parser.add_argument("--flops_profiling", action="store_true")
     parser.add_argument("--flops_profiler_index", type=int, default=5)
 
+    parser.add_argument("--load_from_config", action="store_true")
+    parser.add_argument("--exp_path", type=str)
+    parser.add_argument("--res_path", type=str)
+
     parser.add_argument(
         '--epoch', type=int, default=130, help='training epoches')
     parser.add_argument(
@@ -225,22 +229,26 @@ def main(args):
         datetime.now().strftime("%d%m%y-%H.%M.%S")
     )
 
-    exp_path = os.path.join(
-        args.out,
-        'noise_models_' + args.network + '_{0}_SI{1}_SD{2}'.format(
-            args.experiment_name,
-            args.seed_initialization,
-            args.seed_dataset
+    if args.load_from_config:
+        exp_path = args.exp_path
+        res_path = args.res_path
+    else:
+        exp_path = os.path.join(
+            args.out,
+            'noise_models_' + args.network + '_{0}_SI{1}_SD{2}'.format(
+                args.experiment_name,
+                args.seed_initialization,
+                args.seed_dataset
+            )
         )
-    )
-    res_path = os.path.join(
-        args.out,
-        'metrics' + args.network + '_{0}_SI{1}_SD{2}'.format(
-            args.experiment_name,
-            args.seed_initialization,
-            args.seed_dataset
+        res_path = os.path.join(
+            args.out,
+            'metrics' + args.network + '_{0}_SI{1}_SD{2}'.format(
+                args.experiment_name,
+                args.seed_initialization,
+                args.seed_dataset
+            )
         )
-    )
 
     if not os.path.isdir(res_path):
         os.makedirs(res_path)
@@ -304,8 +312,52 @@ def main(args):
 
     model, model_ema = build_models(args, device)
 
+    if args.load_from_config:
+        # load models
+        load_model = torch.load(
+            os.path.join(
+                exp_path,
+                "/Sel-CL_model_" + str(args.initial_epoch) + "epoch.pth"
+            )
+        )
+        load_model_ema = torch.load(
+            os.path.join(
+                exp_path,
+                "/Sel-CL_model_ema_" + str(args.initial_epoch) + "epoch.pth"
+            )
+        )
+        try:
+            state_dic = {
+                k.replace('module.', ''): v for k, v in load_model['model'].items()
+            }
+        except:
+            state_dic = {
+                k.replace('module.', ''): v for k, v in load_model.items()
+            }
+        try:
+            state_dic_ema = {
+                k.replace('module.', ''): v for k, v in load_model_ema['model'].items()
+            }
+        except:
+            state_dic_ema = {
+                k.replace('module.', ''): v for k, v in load_model_ema.items()
+            }
+
+        model.load_state_dict(state_dic)
+        model_ema.load_state_dict(state_dic_ema)
+
+
     uns_contrast = MemoryMoCo(
         args.low_dim, args.uns_queue_k, args.uns_t, thresh=0).cuda()
+
+    if args.load_from_config:
+        # load uns_contrast
+        uns_contrast = torch.load(
+            os.path.join(
+                exp_path,
+                "uns_contrast_" + str(args.initial_epoch) + "epoch.pth"
+            )
+        )
 
     optimizer = optim.SGD(
         model.parameters(),
@@ -315,10 +367,45 @@ def main(args):
     )
     scheduler = get_scheduler(optimizer, len(train_loader), args)
 
+    if args.load_from_config:
+        # load scheduler
+        load_scheduler = torch.load(
+            os.path.join(
+                exp_path,
+                "/scheduler_" + str(args.initial_epoch) + "epoch.pth"
+            )
+        )
+        try:
+            state_dic_scheduler = {
+                k.replace('module.', ''): v for k, v in load_scheduler['model'].items()
+            }
+        except:
+            state_dic_scheduler = {
+                k.replace('module.', ''): v for k, v in load_scheduler.items()
+            }
+
+        scheduler.load_state_dict(state_dic_scheduler)
+
+
     if args.sup_queue_use == 1:
         queue = queue_with_pro(args, device)
     else:
         queue = []
+
+    if args.load_from_config:
+        # load queue
+        queue = torch.load(
+            os.path.join(
+                exp_path,
+                "queue_" + str(args.initial_epoch) + "epoch.pth"
+            )
+        )
+
+    if args.load_from_config and args.initial_epoch >= args.warmup_epoch:
+        # load selected examples
+        selected_examples = np.load(
+            os.path.join(res_path, "selected_examples_train.npy")
+        )
 
     flops_profiler = FlopsProfiler(model)
 
