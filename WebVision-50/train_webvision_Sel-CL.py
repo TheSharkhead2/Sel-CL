@@ -217,22 +217,22 @@ def build_models(args, device, exp_path):
                 "Sel-CL_model_ema_" + str(args.initial_epoch) + "epoch.pth"
             )
         )
-        try:
-            state_dic = {
-                k.replace('module.', ''): v for k, v in load_model['model'].items()
-            }
-        except:
-            state_dic = {
-                k.replace('module.', ''): v for k, v in load_model.items()
-            }
-        try:
-            state_dic_ema = {
-                k.replace('module.', ''): v for k, v in load_model_ema['model'].items()
-            }
-        except:
-            state_dic_ema = {
-                k.replace('module.', ''): v for k, v in load_model_ema.items()
-            }
+        # try:
+        #     state_dic = {
+        #         k.replace('module.', ''): v for k, v in load_model['model'].items()
+        #     }
+        # except:
+        state_dic = {
+            k.replace('module.', ''): v for k, v in load_model.items()
+        }
+        # try:
+        #     state_dic_ema = {
+        #         k.replace('module.', ''): v for k, v in load_model_ema['model'].items()
+        #     }
+        # except:
+        state_dic_ema = {
+            k.replace('module.', ''): v for k, v in load_model_ema.items()
+        }
 
         model.load_state_dict(state_dic)
         model_ema.load_state_dict(state_dic_ema)
