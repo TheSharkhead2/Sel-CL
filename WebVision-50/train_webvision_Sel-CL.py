@@ -317,13 +317,13 @@ def main(args):
         load_model = torch.load(
             os.path.join(
                 exp_path,
-                "/Sel-CL_model_" + str(args.initial_epoch) + "epoch.pth"
+                "Sel-CL_model_" + str(args.initial_epoch) + "epoch.pth"
             )
         )
         load_model_ema = torch.load(
             os.path.join(
                 exp_path,
-                "/Sel-CL_model_ema_" + str(args.initial_epoch) + "epoch.pth"
+                "Sel-CL_model_ema_" + str(args.initial_epoch) + "epoch.pth"
             )
         )
         try:
@@ -372,7 +372,7 @@ def main(args):
         load_scheduler = torch.load(
             os.path.join(
                 exp_path,
-                "/scheduler_" + str(args.initial_epoch) + "epoch.pth"
+                "scheduler_" + str(args.initial_epoch) + "epoch.pth"
             )
         )
         try:
