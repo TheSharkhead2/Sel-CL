@@ -278,8 +278,15 @@ def ResNet34(num_classes):
     return ResNet(BasicBlock, [3, 4, 6, 3], num_classes=num_classes)
 
 
-def ResNet50(num_classes):
-    return ResNet(Bottleneck, [3, 4, 6, 3], num_classes=num_classes)
+def ResNet50(num_classes, low_dim, head, normlinear=False):
+    return ResNet(
+        Bottleneck,
+        [3, 4, 6, 3],
+        head=head,
+        num_classes=num_classes,
+        low_dim=low_dim,
+        normlinear=normlinear
+    )
 
 
 def PreActResNet50(num_classes, low_dim, head, normlinear=False):

@@ -23,5 +23,11 @@ def build_model(args, device):
             low_dim=args.low_dim,
             head=args.headType
         ).to(device)
+    elif args.network == "RN50":
+        model = mod.ResNet50(
+            num_classes=args.num_classes,
+            low_dim=args.low_dim,
+            head=args.headType
+        )
 
     return model
