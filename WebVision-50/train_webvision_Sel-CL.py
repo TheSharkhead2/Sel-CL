@@ -343,8 +343,8 @@ def main(args):
         #     k.replace('module.', ''): v for k, v in load_model_ema.items()
         # }
 
-        model.load_state_dict(load_model)
-        model_ema.load_state_dict(load_model_ema)
+        model.load_state_dict(load_model, strict=False)
+        model_ema.load_state_dict(load_model_ema, strict=False)
 
     uns_contrast = MemoryMoCo(
         args.low_dim, args.uns_queue_k, args.uns_t, thresh=0).cuda()
