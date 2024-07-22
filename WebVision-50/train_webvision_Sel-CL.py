@@ -10,8 +10,15 @@ from datetime import datetime
 from dataset.webvision_dataset import get_dataset
 
 import torch.utils.data as data
+from torch.utils.data import Sampler, WeightedRandomSampler
 from torch import optim
 from torchvision import datasets, transforms, models
+
+import torch.nn.parallel
+import torch.distributed as dist
+import torch.multiprocessing as mp
+import torch.utils.data.distributed
+
 import random
 import sys
 
@@ -30,6 +37,162 @@ from lr_scheduler import get_scheduler
 import wandb
 
 from deepspeed.profiling.flops_profiler import FlopsProfiler
+
+
+class DistributedWeightedSampler(Sampler):
+    """
+    FROM: https://github.com/pytorch/pytorch/issues/77154
+    (with some modifications)
+
+    A class for distributed data sampling with weights.
+
+    .. note::
+
+        For this to work correctly, global seed must be set to be the same
+        across all devices.
+
+    :param weights: A list of weights to sample with.
+    :type weights: list
+    :param num_samples: Number of samples in the dataset.
+    :type num_samples: int
+    :param replacement: Do we sample with or without replacement.
+    :type replacement: bool
+    :param num_replicas: Number of processes running training.
+    :type num_replicas: int
+    :param rank: Current device number.
+    :type rank: int
+    """
+
+    def __init__(
+        self,
+        weights: list,
+        num_samples: int = None,
+        replacement: bool = True,
+        num_replicas: int = None,
+        rank: int = 0
+    ):
+        if num_replicas is None:
+            num_replicas = torch.cuda.device_count()
+
+        self.num_replicas = num_replicas
+        self.num_samples_per_replica = int(
+            math.ceil(len(weights) * 1.0 / self.num_replicas)
+        )
+        self.total_num_samples = (self.num_samples_per_replica *
+                                  self.num_replicas)
+        self.weights = weights
+        self.replacement = replacement
+
+        self.rank = rank
+
+    def __iter__(self):
+        """
+        Produces mini sample list for current rank.
+
+        :returns: A generator of samples.
+        :rtype: Generator
+        """
+
+        if self.rank >= self.num_replicas or self.rank < 0:
+            raise ValueError(
+                "Invalid rank {}, rank should be in "
+                "the interval [0, {}]".format(self.rank, self.num_replicas - 1)
+            )
+
+        weights = self.weights.copy()
+        # add extra samples to make it evenly divisible
+        weights += weights[: (self.total_num_samples) - len(weights)]
+        if not len(weights) == self.total_num_samples:
+            raise RuntimeError(
+                "There is a distributed sampler error. Num weights: {}, total size: {}".format(
+                    len(weights), self.total_size
+                )
+            )
+
+        # subsample for this rank
+        weights = weights[self.rank:self.total_num_samples:self.num_replicas]
+        weights_used = [0] * self.total_num_samples
+        weights_used[self.rank:self.total_num_samples:self.num_replicas] = weights
+
+        return iter(
+            torch.multinomial(
+                input=torch.as_tensor(weights_used, dtype=torch.double),
+                num_samples=self.num_samples_per_replica,
+                replacement=self.replacement,
+            ).tolist()
+        )
+
+    def __len__(self):
+        return self.num_samples_per_replica
+
+
+def setup_for_distributed(is_master):
+    """
+    This function disables printing when not in master process
+    """
+    import builtins as __builtin__
+    builtin_print = __builtin__.print
+
+    def print(*args, **kwargs):
+        force = kwargs.pop('force', False)
+        if is_master or force:
+            builtin_print(*args, **kwargs)
+
+    __builtin__.print = print
+
+
+def is_dist_avail_and_initialized():
+    if not dist.is_available():
+        return False
+    if not dist.is_initialized():
+        return False
+    return True
+
+
+def get_world_size():
+    if not is_dist_avail_and_initialized():
+        return 1
+    return dist.get_world_size()
+
+
+def get_rank():
+    if not is_dist_avail_and_initialized():
+        return 0
+    return dist.get_rank()
+
+
+def is_main_process():
+    return get_rank() == 0
+
+
+def save_on_master(*args, **kwargs):
+    if is_main_process():
+        torch.save(*args, **kwargs)
+
+
+def init_distributed_mode(args):
+    if 'RANK' in os.environ and 'WORLD_SIZE' in os.environ:
+        args.rank = int(os.environ["RANK"])
+        args.world_size = int(os.environ['WORLD_SIZE'])
+        args.gpu = int(os.environ['LOCAL_RANK'])
+    elif 'SLURM_PROCID' in os.environ:
+        args.rank = int(os.environ['SLURM_PROCID'])
+        args.gpu = args.rank % torch.cuda.device_count()
+    else:
+        print('Not using distributed mode')
+        args.distributed = False
+        return
+
+    args.distributed = True
+
+    torch.cuda.set_device(args.gpu)
+    args.dist_backend = 'nccl'
+    print('| distributed init (rank {}): {}'.format(
+        args.rank, args.dist_url), flush=True)
+    torch.distributed.init_process_group(backend=args.dist_backend, init_method=args.dist_url,
+                                         world_size=args.world_size, rank=args.rank)
+    torch.distributed.barrier()
+    setup_for_distributed(args.rank == 0)
 
 
 def parse_args():
@@ -173,26 +336,38 @@ def data_config(args, transform_train, transform_test):
         transform_test
     )
 
+    if args.distributed:
+        train_sampler = torch.utils.data.DistributedSampler(trainset)
+        test_sampler = torch.utils.data.DistributedSampler(testset)
+        imagenet_sampler = torch.utils.data.DistributedSampler(imagenet_set)
+    else:
+        train_sampler = torch.utils.data.SequentialSampler(trainset)
+        test_sampler = torch.utils.data.SequentialSampler(testset)
+        imagenet_sampler = torch.utils.data.SequentialSampler(imagenet_set)
+
     train_loader = torch.utils.data.DataLoader(
         trainset,
         batch_size=args.batch_size,
         shuffle=True,
         num_workers=4,
-        pin_memory=True
+        pin_memory=True,
+        sampler=train_sampler
     )
     test_loader = torch.utils.data.DataLoader(
         testset,
         batch_size=args.test_batch_size,
         shuffle=False,
         num_workers=4,
-        pin_memory=True
+        pin_memory=True,
+        sampler=test_sampler
     )
     imagenet_test_loader = torch.utils.data.DataLoader(
         imagenet_set,
         batch_size=args.test_batch_size,
         shuffle=False,
         num_workers=4,
-        pin_memory=True
+        pin_memory=True,
+        sampler=imagenet_sampler
     )
     print('############# Data loaded #############')
 
@@ -202,9 +377,6 @@ def data_config(args, transform_train, transform_test):
 def build_models(args, device, exp_path):
     model = build_model(args, device)
     model_ema = build_model(args, device)
-
-    model = nn.DataParallel(model)
-    model_ema = nn.DataParallel(model_ema)
 
     print(
         'Total params: {:.2f} M'.format(
@@ -223,6 +395,8 @@ def build_models(args, device, exp_path):
 
 
 def main(args):
+    init_distributed_mode(args)
+
     # add date to out path
     args.out = os.path.join(
         args.out,
@@ -312,6 +486,16 @@ def main(args):
 
     model, model_ema = build_models(args, device, exp_path)
 
+    if args.distributed:
+        model.to(device)
+        model = torch.nn.parallel.DistributedDataParallel(
+                model, device_ids=[args.gpu]
+            )
+        model_ema.to(device)
+        model_ema = torch.nn.parallel.DistributedDataParallel(
+                model_ema, device_ids=[args.gpu]
+            )
+
     if args.load_from_config:
         # load models
         load_model = torch.load(
@@ -326,22 +510,6 @@ def main(args):
                 "Sel-CL_model_ema_" + str(args.initial_epoch) + "epoch.pth"
             )
         )
-        # try:
-        #     state_dic = {
-        #         k.replace('module.', ''): v for k, v in load_model['model'].items()
-        #     }
-        # except:
-        # state_dic = {
-        #     k.replace('module.', ''): v for k, v in load_model.items()
-        # }
-        # try:
-        #     state_dic_ema = {
-        #         k.replace('module.', ''): v for k, v in load_model_ema['model'].items()
-        #     }
-        # except:
-        # state_dic_ema = {
-        #     k.replace('module.', ''): v for k, v in load_model_ema.items()
-        # }
 
         model.load_state_dict(load_model, strict=False)
         model_ema.load_state_dict(load_model_ema, strict=False)
@@ -384,7 +552,6 @@ def main(args):
             }
 
         scheduler.load_state_dict(state_dic_scheduler)
-
 
     if args.sup_queue_use == 1:
         queue = queue_with_pro(args, device)
@@ -429,14 +596,24 @@ def main(args):
                     flops_profiler
                 )
             else:
+                if args.distributed:
+                    train_selected_sampler = DistributedWeightedSampler(
+                        torch.ones(len(trainset)),
+                        len(trainset),
+                        rank=get_rank()
+                    )
+                else:
+                    train_selected_sampler = \
+                        torch.utils.data.WeightedRandomSampler(
+                            torch.ones(len(trainset)), len(trainset)
+                        )
+
                 train_selected_loader = torch.utils.data.DataLoader(
                     trainset,
                     batch_size=args.batch_size,
                     num_workers=4,
                     pin_memory=True,
-                    sampler=torch.utils.data.WeightedRandomSampler(
-                        torch.ones(len(trainset)), len(trainset)
-                    )
+                    sampler=train_selected_sampler
                 )
                 trainNoisyLabels = torch.LongTensor(
                     train_loader.dataset.targets).unsqueeze(1).to(device)
@@ -458,14 +635,23 @@ def main(args):
                     flops_profiler
                 )
         else:
+            if args.distributed:
+                train_selected_sampler = DistributedWeightedSampler(
+                    selected_examples,
+                    len(selected_examples),
+                    rank=get_rank()
+                )
+            else:
+                train_selected_sampler = \
+                    torch.utils.data.WeightedRandomSampler(
+                       selected_examples, len(selected_examples)
+                    )
             train_selected_loader = torch.utils.data.DataLoader(
                 trainset,
                 batch_size=args.batch_size,
                 num_workers=4,
                 pin_memory=True,
-                sampler=torch.utils.data.WeightedRandomSampler(
-                    selected_examples, len(selected_examples)
-                )
+                sampler=train_selected_sampler
             )
             train_sel(
                 args,
