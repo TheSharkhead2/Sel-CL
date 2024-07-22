@@ -198,6 +198,29 @@ def init_distributed_mode(args):
 def parse_args():
     parser = argparse.ArgumentParser(description='command for the first train')
 
+    parser.add_argument(
+        '--rank',
+        default=-1,
+        type=int,
+        help='node rank for distributed training'
+    )
+    parser.add_argument(
+        '--dist-eval',
+        action='store_true',
+        default=False,
+        help=('Enabling distributed evaluation'
+              ' (recommended during training for faster monitor')
+    )
+    parser.add_argument(
+        '--dist-url',
+        default='env://',
+        type=str,
+        help='url used to set up distributed training'
+    )
+    parser.add_argument(
+        '--dist-backend', default='nccl', type=str, help='distributed backend'
+    )
+
     parser.add_argument("--wandb-project", default="NaN", type=str)
     parser.add_argument("--root", type=str)
     parser.add_argument("--flops_profiling", action="store_true")
