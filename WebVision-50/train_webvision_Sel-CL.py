@@ -360,18 +360,29 @@ def data_config(args, transform_train, transform_test):
     )
 
     if args.distributed:
-        train_sampler = torch.utils.data.DistributedSampler(trainset)
-        test_sampler = torch.utils.data.DistributedSampler(testset)
-        imagenet_sampler = torch.utils.data.DistributedSampler(imagenet_set)
+        train_sampler = torch.utils.data.DistributedSampler(
+            trainset, shuffle=True
+        )
+        test_sampler = torch.utils.data.DistributedSampler(
+            testset, shuffle=False
+        )
+        imagenet_sampler = torch.utils.data.DistributedSampler(
+            imagenet_set, shuffle=False
+        )
     else:
-        train_sampler = torch.utils.data.SequentialSampler(trainset)
-        test_sampler = torch.utils.data.SequentialSampler(testset)
-        imagenet_sampler = torch.utils.data.SequentialSampler(imagenet_set)
+        train_sampler = torch.utils.data.SequentialSampler(
+            trainset, shuffle=True
+        )
+        test_sampler = torch.utils.data.SequentialSampler(
+            testset, shuffle=False
+        )
+        imagenet_sampler = torch.utils.data.SequentialSampler(
+            imagenet_set, shuffle=False
+        )
 
     train_loader = torch.utils.data.DataLoader(
         trainset,
         batch_size=args.batch_size,
-        shuffle=True,
         num_workers=4,
         pin_memory=True,
         sampler=train_sampler
@@ -379,7 +390,6 @@ def data_config(args, transform_train, transform_test):
     test_loader = torch.utils.data.DataLoader(
         testset,
         batch_size=args.test_batch_size,
-        shuffle=False,
         num_workers=4,
         pin_memory=True,
         sampler=test_sampler
@@ -387,7 +397,6 @@ def data_config(args, transform_train, transform_test):
     imagenet_test_loader = torch.utils.data.DataLoader(
         imagenet_set,
         batch_size=args.test_batch_size,
-        shuffle=False,
         num_workers=4,
         pin_memory=True,
         sampler=imagenet_sampler
