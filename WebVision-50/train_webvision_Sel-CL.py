@@ -453,10 +453,6 @@ def main(args):
     if not os.path.isdir(exp_path):
         os.makedirs(exp_path)
 
-    __console__ = sys.stdout
-    name = "/results"
-    log_file = open(res_path+name+".log", 'a')
-    sys.stdout = log_file
     print(args)
 
     # best_ac only record the best top1_ac for validation set.
@@ -615,7 +611,6 @@ def main(args):
                     train_loader,
                     optimizer,
                     epoch,
-                    log_file,
                     flops_profiler
                 )
             else:
@@ -654,7 +649,6 @@ def main(args):
                     optimizer,
                     epoch,
                     torch.eq(trainNoisyLabels, trainNoisyLabels.t()),
-                    log_file,
                     flops_profiler
                 )
         else:
@@ -689,7 +683,6 @@ def main(args):
                 optimizer,
                 epoch,
                 selected_pairs,
-                log_file,
                 flops_profiler
             )
 
@@ -748,7 +741,6 @@ def main(args):
 
         print('Epoch time: {:.2f} seconds\n'.format(time.time()-st))
         st = time.time()
-        log_file.flush()
 
         if (epoch % 10 == 0):
             snapLast = "Sel-CL_model"

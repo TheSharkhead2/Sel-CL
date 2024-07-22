@@ -43,7 +43,6 @@ def train_sel(
     optimizer,
     epoch,
     selected_pairs,
-    log_file,
     flops_profiler
 ):
     train_loss_1 = AverageMeter()
@@ -341,7 +340,6 @@ def train_sel(
                     optimizer.param_groups[0]['lr']
                 )
             )
-            log_file.flush()
         counter = counter + 1
 
     print(
@@ -366,7 +364,6 @@ def train_uns(
     train_loader,
     optimizer,
     epoch,
-    log_file,
     flops_profiler
 ):
     train_loss_1 = AverageMeter()
@@ -455,7 +452,6 @@ def train_uns(
                     optimizer.param_groups[0]['lr']
                 )
             )
-            log_file.flush()
         counter = counter + 1
     print('train_uns_loss', train_loss_1.avg)
     print('train time', time.time()-end)
@@ -474,7 +470,6 @@ def train_sup(
     optimizer,
     epoch,
     noisy_pairs,
-    log_file,
     flops_profiler
 ):
     train_loss_1 = AverageMeter()
@@ -715,7 +710,6 @@ def train_sup(
                     optimizer.param_groups[0]['lr']
                 )
             )
-            log_file.flush()
         counter = counter + 1
 
     print(
