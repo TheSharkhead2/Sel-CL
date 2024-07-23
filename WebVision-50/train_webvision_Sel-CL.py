@@ -519,6 +519,10 @@ def main(args):
                 test_loader,
                 epoch
             )
+            print("selected_examples ", selected_examples)
+            print("selected pairs ", selected_pairs)
+            print("selected examples size ", selected_examples.shape)
+            print("selected pairs size ", selected_pairs.shape)
 
             selected_examples, selected_pairs = (
                 selected_examples.to(device),

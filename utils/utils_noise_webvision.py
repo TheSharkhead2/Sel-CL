@@ -933,7 +933,7 @@ def pair_selection(args, net, device, trainloader, testloader, epoch):
             num_clean_per_class, args.alpha)
 
     # print("num_samples2select_class initial", num_samples2select_class)
-    # print("num_clean_per_class", num_clean_per_class)
+    print("num_clean_per_class", num_clean_per_class)
 
     agreement_measure = torch.zeros(
         (len(temploader.dataset.targets),)).to(device)
