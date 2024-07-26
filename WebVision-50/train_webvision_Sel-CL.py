@@ -88,7 +88,8 @@ def parse_args():
     parser.add_argument(
         '--dataset', type=str, default='inat100k', help='helpful help',
         choices=[
-            "inat100k"
+            "inat100k",
+            "auto_arborist"
         ]
     )
 
@@ -305,10 +306,9 @@ def main(args):
     ])
 
     # data loader
-    num_classes = args.num_classes
-
     train_loader, test_loader, imagenet_test_loader, trainset = data_config(
         args, transform_train, transform_test)
+    # num_classes = args.num_classes
 
     model, model_ema = build_models(args, device, exp_path)
 
@@ -326,22 +326,6 @@ def main(args):
                 "Sel-CL_model_ema_" + str(args.initial_epoch) + "epoch.pth"
             )
         )
-        # try:
-        #     state_dic = {
-        #         k.replace('module.', ''): v for k, v in load_model['model'].items()
-        #     }
-        # except:
-        # state_dic = {
-        #     k.replace('module.', ''): v for k, v in load_model.items()
-        # }
-        # try:
-        #     state_dic_ema = {
-        #         k.replace('module.', ''): v for k, v in load_model_ema['model'].items()
-        #     }
-        # except:
-        # state_dic_ema = {
-        #     k.replace('module.', ''): v for k, v in load_model_ema.items()
-        # }
 
         model.load_state_dict(load_model, strict=False)
         model_ema.load_state_dict(load_model_ema, strict=False)
@@ -384,7 +368,6 @@ def main(args):
             }
 
         scheduler.load_state_dict(state_dic_scheduler)
-
 
     if args.sup_queue_use == 1:
         queue = queue_with_pro(args, device)

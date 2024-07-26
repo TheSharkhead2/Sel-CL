@@ -71,13 +71,6 @@ def get_dataset_classidx(
 
 
 def get_dataset(args, transform_train, transform_test):
-    # train = iNatDataset(
-    #     args,
-    #     train=True,
-    #     transform=transform_train,
-    #     target_transform=transform_test,
-    #     download=args.download
-    # )
     if args.dataset == "inat100k":
         train_dir = os.path.join(args.root, "train")
         val_dir = os.path.join(args.root, "val")
@@ -91,13 +84,6 @@ def get_dataset(args, transform_train, transform_test):
         class_to_idx = {class_name: idx for idx,
                         class_name in enumerate(all_classes)}
 
-        # train = get_dataset_classidx(
-        #     train_dir,
-        #     all_classes,
-        #     class_to_idx,
-        #     transform_train,
-        #     # target_transform=transform_test
-        # )
         train = inat_dataset(
             args.root,
             transform_train,
@@ -106,15 +92,6 @@ def get_dataset(args, transform_train, transform_test):
             args.num_classes,
             class_to_idx
         )
-        # args.num_classes = len(train.classes)
-
-        # val = get_dataset_classidx(
-        #     val_dir,
-        #     all_classes,
-        #     class_to_idx,
-        #     transform_test,
-        #     # target_transform=transform_test
-        # )
         val = inat_dataset(
             args.root,
             transform_test,
@@ -124,12 +101,46 @@ def get_dataset(args, transform_train, transform_test):
             class_to_idx
         )
 
-        # test = get_dataset_classidx(
-        #     test_dir,
-        #     all_classes,
-        #     class_to_idx,
-        #     transform_test
-        # )
+        test = inat_dataset(
+            args.root,
+            transform_test,
+            transform_test,
+            "test",
+            args.num_classes,
+            class_to_idx
+        )
+
+    elif args.dataset == "auto_arborist":
+        train_dir = os.path.join(args.root, "train")
+        val_dir = os.path.join(args.root, "val")
+        test_dir = os.path.join(args.root, "test")
+
+        all_classes = get_all_classes(train_dir, val_dir, test_dir)
+
+        args.num_classes = len(all_classes)
+
+        # Create a universal class_to_idx mapping
+        class_to_idx = {class_name: idx for idx,
+                        class_name in enumerate(all_classes)}
+
+        # probably fine to keep inat_dataset
+        train = inat_dataset(
+            args.root,
+            transform_train,
+            transform_test,
+            "train",
+            args.num_classes,
+            class_to_idx
+        )
+        val = inat_dataset(
+            args.root,
+            transform_test,
+            transform_test,
+            "val",
+            args.num_classes,
+            class_to_idx
+        )
+
         test = inat_dataset(
             args.root,
             transform_test,
@@ -145,14 +156,6 @@ def get_dataset(args, transform_train, transform_test):
         raise Exception(args.dataset + " is not a dataset")
 
     return train, val, test
-    # train_dataset = webvision_dataset(root_dir=args.trainval_root, transform=transform_train, target_transform=transform_test, mode='all', num_class=50)
-
-    # #################################### Test set #############################################
-    # test_dataset_1 = webvision_dataset(root_dir=args.trainval_root, transform=transform_test, target_transform=transform_test, mode='test', num_class=50)
-
-    # test_dataset_2 = imagenet_dataset(root_dir=args.val_root, web_root=args.trainval_root, transform=transform_test,  num_class=50)
-
-    # return train_dataset, test_dataset_1, test_dataset_2
 
 
 class inat_dataset(Dataset):
